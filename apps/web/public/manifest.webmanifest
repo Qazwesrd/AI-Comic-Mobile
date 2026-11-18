@@ -1,0 +1,14 @@
+{
+  "id": "/",
+  "name": "AI 漫剧手机版",
+  "short_name": "AI 漫剧",
+  "description": "移动端 AI 漫剧创作工作台",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080817",
+  "theme_color": "#080817",
+  "icons": []
+}
