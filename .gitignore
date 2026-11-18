@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local databases and generated media
+*.db
+*.sqlite3
+storage/
+uploads/
+generated/
+*.log
+
+# Mobile build outputs
+android/.gradle/
+android/app/build/
+ios/Pods/
