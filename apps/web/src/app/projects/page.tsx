@@ -48,6 +48,7 @@ export default function ProjectsPage() {
   const [artifact, setArtifact] = useState("");
   const [entities, setEntities] = useState<Entity[]>([]);
   const [artifacts, setArtifacts] = useState<CreativeArtifact[]>([]);
+  const [visualPreview, setVisualPreview] = useState<{ assetId: number; url: string } | null>(null);
   const [imageStyle, setImageStyle] = useState("3d_anime");
   const [step, setStep] = useState<Step>(1);
   const [message, setMessage] = useState("");
@@ -254,6 +255,20 @@ export default function ProjectsPage() {
     }
   }
 
+  async function previewVisual(assetId: number) {
+    try {
+      const response = await fetch(`${API}/api/v1/assets/${assetId}/download`, { credentials: "include" });
+      if (!response.ok) throw new Error("图片读取失败");
+      const url = URL.createObjectURL(await response.blob());
+      setVisualPreview(current => {
+        if (current) URL.revokeObjectURL(current.url);
+        return { assetId, url };
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "无法预览图片");
+    }
+  }
+
   async function downloadVisual(assetId: number) {
     const response = await fetch(`${API}/api/v1/assets/${assetId}/download`, { credentials: "include" });
     if (!response.ok) {
@@ -400,8 +415,10 @@ export default function ProjectsPage() {
                       <div className="project-entity-actions">
                         <button type="button" className="account-submit" onClick={() => void approveEntity(entity)}>{entity.approved ? "取消确认" : "确认此素材"}</button>
                         <button type="button" className="account-submit" disabled={!entity.approved || busy} onClick={() => void generateEntityImage(entity)}>{entity.visual_asset_id ? "重新生成参考图" : "生成三视图 / 场景图"}</button>
+                        {entity.visual_asset_id && <button type="button" className="account-submit secondary" onClick={() => void previewVisual(entity.visual_asset_id!)}>预览参考图</button>}
                         {entity.visual_asset_id && <button type="button" className="account-submit secondary" onClick={() => void downloadVisual(entity.visual_asset_id!)}>下载图片</button>}
                       </div>
+                      {visualPreview?.assetId === entity.visual_asset_id && <div className="project-visual-preview"><img src={visualPreview.url} alt={`${entity.name}视觉参考图`} /><button type="button" className="account-submit secondary" onClick={() => setVisualPreview(current => { if (current) URL.revokeObjectURL(current.url); return null; })}>关闭预览</button></div>}
                     </article>
                   ))}
                 </>
