@@ -40,6 +40,13 @@ class UploadInitIn(BaseModel):
     chunk_size: int = Field(default=8 * 1024 * 1024, ge=1024 * 1024, le=8 * 1024 * 1024)
 
 
+class AssetUpdateIn(BaseModel):
+    project_id: int | None = None
+    asset_type: str | None = Field(default=None, pattern="^(character|scene|prop|image|reference|video|audio|subtitle|text)$")
+    title: str | None = Field(default=None, min_length=1, max_length=180)
+    approved: bool | None = None
+
+
 def _media_root() -> Path:
     root = Path(settings.media_root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -108,6 +115,7 @@ def init_upload(
         "character": "image/", "scene": "image/", "prop": "image/", "image": "image/",
         "reference": ("image/", "application/pdf"), "video": "video/",
         "audio": "audio/", "subtitle": ("text/", "application/x-subrip"),
+        "text": ("text/", "application/json"),
         "text": ("text/", "application/json"),
     }[payload.asset_type]
     accepted = expected_prefix if isinstance(expected_prefix, tuple) else (expected_prefix,)
@@ -240,6 +248,41 @@ def list_assets(
              "asset_type": a.asset_type, "title": a.title, "file_name": a.file_name,
              "mime_type": a.mime_type, "size_bytes": a.size_bytes,
              "approved": a.approved, "created_at": a.created_at.isoformat()} for a in rows]
+
+
+@router.patch("/assets/{asset_id}")
+def update_asset(
+    asset_id: int, payload: AssetUpdateIn,
+    user=Depends(get_current_user), db: Session = Depends(get_db),
+):
+    asset = db.scalar(select(MediaAsset).where(
+        MediaAsset.id == asset_id, MediaAsset.user_id == user.id
+    ))
+    if asset is None:
+        raise HTTPException(status_code=404, detail="素材不存在")
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="没有需要更新的素材信息")
+    if "project_id" in changes:
+        _owned_project(db, changes["project_id"], user.id)
+        asset.project_id = changes["project_id"]
+    if "asset_type" in changes and changes["asset_type"] is not None:
+        new_type = changes["asset_type"]
+        extension = Path(asset.file_name).suffix.lower()
+        if extension not in _allowed_extensions(new_type):
+            raise HTTPException(status_code=415, detail="文件格式与所选素材类型不匹配")
+        asset.asset_type = new_type
+    if "title" in changes and changes["title"] is not None:
+        asset.title = changes["title"].strip()
+    if "approved" in changes and changes["approved"] is not None:
+        asset.approved = changes["approved"]
+    db.commit()
+    db.refresh(asset)
+    audit(db, "media_asset_updated", "media_asset", str(asset.id), user.id)
+    return {
+        "id": asset.id, "project_id": asset.project_id, "asset_type": asset.asset_type,
+        "title": asset.title, "file_name": asset.file_name, "approved": asset.approved,
+    }
 
 
 @router.get("/assets/{asset_id}/download")
