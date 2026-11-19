@@ -101,7 +101,7 @@ def _get_upload(db: Session, upload_id: str, user_id: int) -> UploadSession:
 @router.post("/uploads/init")
 def init_upload(
     payload: UploadInitIn, request: Request,
-    user=Depends(require_active_license), db: Session = Depends(get_db),
+    user=Depends(get_current_user), db: Session = Depends(get_db),
 ):
     enforce_rate_limit(db, f"upload-init:{user.id}:{request_fingerprint(request)}", 30, 3600)
     if payload.size_bytes > settings.max_upload_bytes:
@@ -150,7 +150,7 @@ def init_upload(
 async def upload_chunk(
     upload_id: str, chunk_index: int, request: Request,
     x_chunk_sha256: str = Header(default=""),
-    user=Depends(require_active_license), db: Session = Depends(get_db),
+    user=Depends(get_current_user), db: Session = Depends(get_db),
 ):
     session = _get_upload(db, upload_id, user.id)
     enforce_rate_limit(db, f"upload-chunk:{user.id}:{upload_id}", session.total_chunks * 3, 3600)
@@ -235,7 +235,7 @@ def complete_upload(
 @router.get("/assets")
 def list_assets(
     project_id: int | None = None, asset_type: str | None = None,
-    user=Depends(require_active_license), db: Session = Depends(get_db),
+    user=Depends(get_current_user), db: Session = Depends(get_db),
 ):
     query = select(MediaAsset).where(MediaAsset.user_id == user.id)
     if project_id is not None:
@@ -252,7 +252,7 @@ def list_assets(
 @router.patch("/assets/{asset_id}")
 def update_asset(
     asset_id: int, payload: AssetUpdateIn,
-    user=Depends(require_active_license), db: Session = Depends(get_db),
+    user=Depends(get_current_user), db: Session = Depends(get_db),
 ):
     asset = db.scalar(select(MediaAsset).where(
         MediaAsset.id == asset_id, MediaAsset.user_id == user.id
@@ -285,7 +285,7 @@ def update_asset(
 
 
 @router.get("/assets/{asset_id}/download")
-def download_asset(asset_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
+def download_asset(asset_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
     asset = db.scalar(select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.user_id == user.id))
     if asset is None:
         raise HTTPException(status_code=404, detail="素材不存在")
@@ -296,7 +296,7 @@ def download_asset(asset_id: int, user=Depends(require_active_license), db: Sess
 
 
 @router.delete("/assets/{asset_id}")
-def delete_asset(asset_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
+def delete_asset(asset_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
     asset = db.scalar(select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.user_id == user.id))
     if asset is None:
         raise HTTPException(status_code=404, detail="素材不存在")
