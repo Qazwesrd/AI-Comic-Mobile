@@ -75,7 +75,7 @@ def test_visual_generation_requires_provider_configuration(monkeypatch):
         entity = StoryEntity(
             entity_uuid="11111111-2222-4333-8444-555555555555",
             novel_id=novel_id, entity_type="character", canonical_name="主角",
-            description="穿着蓝色外套的年轻冒险者", approved=True,
+            description="穿着蓝色外套的年轻冒险者", approved=False,
         )
         db.add(entity)
         db.commit()
@@ -83,8 +83,18 @@ def test_visual_generation_requires_provider_configuration(monkeypatch):
         entity_id = entity.id
         db.close()
 
+        image_url = f"/api/v1/projects/{project_id}/novels/{novel_id}/entities/{entity_id}/generate-image"
+        unapproved = client.post(image_url, headers=headers, json={"style": "3d_anime"})
+        assert unapproved.status_code == 409
+        assert "先审核" in unapproved.json()["detail"]
+
+        db = TestingSessionLocal()
+        db.query(StoryEntity).filter(StoryEntity.id == entity_id).update({"approved": True})
+        db.commit()
+        db.close()
+
         response = client.post(
-            f"/api/v1/projects/{project_id}/novels/{novel_id}/entities/{entity_id}/generate-image",
+            image_url,
             headers=headers, json={"style": "3d_anime"},
         )
         assert response.status_code == 503
