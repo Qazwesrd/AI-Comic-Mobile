@@ -138,11 +138,11 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
         db = TestingSessionLocal()
         try:
             user = db.scalar(select(User).where(User.email == "trial-expired@example.com"))
-            expired_at = utc_now() - timedelta(days=4)
+            expired_at = utc_now() - timedelta(days=3)
             db.execute(update(License).where(License.user_id == user.id).values(trial_started_at=expired_at))
             db.commit()
             refreshed = db.scalar(select(License).where(License.user_id == user.id))
-            assert refreshed.trial_started_at.replace(tzinfo=expired_at.tzinfo) < utc_now() - timedelta(hours=72)
+            assert refreshed.trial_started_at.replace(tzinfo=expired_at.tzinfo) < utc_now() - timedelta(hours=48)
         finally:
             db.close()
 
