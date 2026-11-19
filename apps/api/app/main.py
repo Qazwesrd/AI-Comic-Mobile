@@ -9,6 +9,7 @@ from .database import Base, engine
 from .routers.accounts import router as accounts_router
 from .routers.platform import router as platform_router
 from .routers.assets import router as assets_router
+from .routers.renders import router as renders_router
 
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ app.add_middleware(
 app.include_router(accounts_router)
 app.include_router(platform_router)
 app.include_router(assets_router)
+app.include_router(renders_router)
 
 
 @app.get("/health", tags=["system"])
