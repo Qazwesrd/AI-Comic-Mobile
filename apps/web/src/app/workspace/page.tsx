@@ -20,23 +20,37 @@ export default function WorkspacePage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError("");
     fetch(API + "/api/v1/projects", { credentials: "include" })
       .then(async response => {
         if (response.status === 401) {
           if (active) setSignedIn(false);
           return [];
         }
-        if (!response.ok) throw new Error("读取项目失败");
+        if (!response.ok) throw new Error(`读取项目失败（HTTP ${response.status}）`);
         return await response.json() as Project[];
       })
-      .then(rows => { if (active) setProjects(rows.slice(0, 4)); })
-      .catch(() => { if (active) setProjects([]); })
+      .then(rows => {
+        if (active) {
+          setSignedIn(true);
+          setProjects(rows.slice(0, 4));
+        }
+      })
+      .catch(error => {
+        if (active) {
+          setProjects([]);
+          setLoadError(error instanceof Error ? error.message : "无法连接服务器，请检查网络和 API 地址配置。");
+        }
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
 
   return (
     <main className="app-shell mobile-workspace">
@@ -56,8 +70,9 @@ export default function WorkspacePage() {
 
       <section className="workspace workspace-resume" aria-label="继续创作">
         <div className="section-heading"><div><p className="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>继续上次创作</h2></div><a className="section-link" href="/projects/">全部项目 ↗</a></div>
-        {!signedIn ? <article className="workspace-empty"><strong>登录后即可同步你的项目</strong><p>登录后会显示最近创作的项目，可从上次进度继续。</p><a href="/login/">前往登录 →</a></article>
+        {!signedIn ? <article className="workspace-empty"><strong>登录后即可同步你的项目</strong><p>登录后会显示最近创作的项目，可从上次进度继续。</p><a href="/account/">前往登录 →</a></article>
           : loading ? <p className="workspace-loading">正在读取最近项目…</p>
+          : loadError ? <article className="workspace-empty" role="alert"><strong>暂时无法连接创作服务</strong><p>{loadError} 请确认服务器已启动且手机网络可访问，然后重试。</p><button type="button" className="account-submit" onClick={() => setReloadKey(value => value + 1)}>重新连接</button></article>
           : projects.length ? <div className="workspace-recent-grid">{projects.map(project => <a className="workspace-recent-card" href={`/projects?project=${project.id}`} key={project.id}><span>项目 #{project.id}</span><strong>{project.title}</strong><small>{project.status || "进行中"} · 点击继续</small></a>)}</div>
           : <article className="workspace-empty"><strong>还没有创作项目</strong><p>创建第一个项目并导入 TXT 小说，AI 将帮助你拆分章节、识别素材并生成剧本与分镜。</p><a href="/projects/">创建第一个项目 →</a></article>}
       </section>
