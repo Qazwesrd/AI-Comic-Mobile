@@ -51,6 +51,10 @@ class PasswordResetIn(TokenIn):
     new_password: str = Field(min_length=10, max_length=128)
 
 
+class OrderCreateIn(BaseModel):
+    product_code: str = Field(min_length=2, max_length=48)
+
+
 class ProductIn(BaseModel):
     code: str = Field(min_length=2, max_length=48)
     name: str = Field(min_length=2, max_length=120)
@@ -166,9 +170,10 @@ def list_products(db: Session = Depends(get_db)):
 
 @router.post("/orders")
 def create_order(
-    payload: dict, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    payload: OrderCreateIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    code = str(payload.get("product_code", ""))
+    enforce_rate_limit(db, f"create-order:{request_fingerprint(request)}", 10, 3600)
+    code = payload.product_code
     product = db.scalar(select(Product).where(Product.code == code, Product.active.is_(True)))
     if product is None:
         raise HTTPException(status_code=404, detail="商品不存在或暂未开放购买")
@@ -184,9 +189,9 @@ def create_order(
     return {
         "order_no": order.order_no, "status": order.status,
         "amount_minor": order.amount_minor, "currency": order.currency,
-        "checkout_url": settings.payment_checkout_url or None,
-        "payment_configured": bool(settings.payment_checkout_url and settings.payment_webhook_secret),
-        "message": "支付渠道尚未配置；当前只创建待支付订单，不能解锁永久授权"
+        "checkout_url": None,
+        "payment_configured": False,
+        "message": "尚未接入具体支付服务商；当前只创建待支付订单，不能解锁永久授权"
     }
 
 
@@ -221,6 +226,8 @@ async def payment_webhook(request: Request, x_payment_signature: str = Header(de
         raise HTTPException(status_code=404, detail="订单不存在")
     if status_value != "paid":
         return {"received": True, "ignored": True}
+    if order.status == "paid":
+        return {"received": True, "already_paid": True}
     if amount != order.amount_minor or currency != order.currency:
         raise HTTPException(status_code=409, detail="订单金额或币种不匹配")
     product = db.get(Product, order.product_id)
@@ -395,7 +402,8 @@ async def analyze_novel(
         )
         chapter.analysis_json = json.dumps(result, ensure_ascii=False)
         results.append({"chapter_no": chapter.chapter_no, "analysis": result})
-    novel.analysis_status = "partially_analyzed" if len(chapters) == limit else "analyzed"
+    total_chapters = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
+    novel.analysis_status = "analyzed" if len(results) >= total_chapters else "partially_analyzed"
     db.commit()
     return {"novel_id": novel.id, "processed_chapters": len(results), "results": results,
             "message": "章节解析已完成；请人工审核人物、场景、道具和关系识别结果"}
