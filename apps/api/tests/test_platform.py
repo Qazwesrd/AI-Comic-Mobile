@@ -250,3 +250,20 @@ def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
         })
         assert first.status_code == 401
         assert second.status_code == 429
+
+
+def test_tomato_platform_publish_draft_is_supported_without_claiming_auto_publish():
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "tomato-publisher@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activation = client.post("/api/v1/license/activate", headers=headers,
+                                 json={"device_id": "tomato-publish-device", "platform": "android"})
+        assert activation.status_code == 200
+        response = client.post("/api/v1/publishing/jobs", headers=headers, json={
+            "platform": "fanqie", "title": "番茄平台测试作品",
+            "description": "发布资料草稿", "media_url": "https://media.example.com/test.mp4",
+        })
+        assert response.status_code == 200, response.text
+        assert response.json()["platform"] == "fanqie"
+        assert response.json()["status"] == "manual_required"
+        assert response.json()["auto_publish_available"] is False
