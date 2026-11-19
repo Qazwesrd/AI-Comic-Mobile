@@ -45,6 +45,7 @@ jobs:
                   <package android:name="com.anthropic.claude" />
                   <package android:name="com.larus.nova" />
                   <package android:name="com.bytedance.dreamina" />
+                  <package android:name="com.lemon.lvoverseas" />
               </queries>
           """
           if "<queries>" not in content:
