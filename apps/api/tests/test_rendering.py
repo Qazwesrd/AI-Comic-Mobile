@@ -53,6 +53,14 @@ def test_render_endpoint_reports_missing_ffmpeg(monkeypatch):
 
 
 def test_render_rejects_empty_timeline():
-    with TestClient(app) as client:
-        response = client.post("/api/v1/renders", json={"shots": []})
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        registered = client.post("/api/v1/auth/register", json={
+            "email": "render-empty@example.com", "password": "a-very-secure-password"
+        })
+        csrf = registered.json()["csrf_token"]
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        client.post("/api/v1/license/activate", headers=headers, json={
+            "device_id": "render-device-0002", "platform": "web"
+        })
+        response = client.post("/api/v1/renders", headers=headers, json={"shots": []})
         assert response.status_code == 422
