@@ -30,7 +30,7 @@
 - [x] 可配置 OpenAI 兼容模型网关
 - [x] 章节结构化分析 API
 - [x] 剧本改编与分镜规划 JSON API
-- [ ] 人物/场景/道具统一资产表、审核界面和跨章节一致性
+- [x] 基础人物/场景/道具识别记录、稳定 UUID、审核确认 API 与手机端界面\n- [ ] 跨章节角色一致性、资产合并/拆分和更丰富的审核编辑
 - [ ] 图片生成、三视图、场景/道具视觉资产
 - [ ] 配音、音频、字幕生成与编辑
 - [ ] 漫剧时间线编辑、视频渲染、FFmpeg 合成和导出
@@ -47,8 +47,8 @@
 - [ ] 发布状态回调、失败恢复、媒体上传和真机验收
 
 ## 阶段 5：移动端构建与发布
-- [ ] PWA 离线壳、安装体验和 iPhone Safari 真机验证
-- [ ] Capacitor Android 工程、APK/AAB 构建、签名和升级流程
+- [x] PWA manifest、离线壳、service worker、科技风 SVG 图标\n- [ ] iPhone Safari 真机验证
+- [x] Capacitor Android/iOS 工程配置与 Android Debug APK 构建工作流\n- [ ] Android release 签名、APK/AAB 发布和升级流程
 - [ ] Android/iOS 权限、弱网、媒体上传续传测试
 - [ ] 安全、隐私、支付和授权验收
 - [ ] 正式下载站与版本文件存储
