@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import License, Product, User
+from app.models import License, Product, Release, User
 from app.security_services import consume_one_time_token, create_one_time_token
 
 
@@ -62,6 +62,39 @@ def test_project_novel_import_and_owner_isolation():
         assert imported.json()["chapter_count"] == 2
         assert client.get("/api/v1/projects").json()[0]["title"] == "测试小说"
 
+
+
+def test_release_download_requires_permanent_license_and_hides_direct_url():
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "release-trial@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activation = client.post("/api/v1/license/activate", headers=headers,
+                                 json={"device_id": "release-test-device", "platform": "android"})
+        assert activation.status_code == 200
+        db = TestingSessionLocal()
+        release = Release(platform="android", version="1.0.0",
+                          download_url="https://downloads.example.com/app.apk",
+                          notes="测试版本", minimum_supported_version="1.0.0", published=True)
+        db.add(release)
+        db.commit()
+        db.refresh(release)
+        release_id = release.id
+        db.close()
+        public_versions = client.get("/api/v1/releases")
+        assert public_versions.status_code == 200
+        assert public_versions.json()[0]["release_id"] == release_id
+        assert "download_url" not in public_versions.json()[0]
+        denied = client.get(f"/api/v1/releases/{release_id}/download", follow_redirects=False)
+        assert denied.status_code == 403
+        db = TestingSessionLocal()
+        license_record = db.scalar(select(License).join(User).where(User.email == "release-trial@example.com"))
+        assert license_record is not None
+        license_record.permanent = True
+        db.commit()
+        db.close()
+        allowed = client.get(f"/api/v1/releases/{release_id}/download", follow_redirects=False)
+        assert allowed.status_code == 302
+        assert allowed.headers["location"] == "https://downloads.example.com/app.apk"
 
 def test_one_time_tokens_are_single_use():
     db = TestingSessionLocal()
