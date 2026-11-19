@@ -2,6 +2,11 @@ name: Android Debug APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/android-build.yml"
 
 jobs:
   android:
@@ -10,7 +15,7 @@ jobs:
       run:
         working-directory: apps/web
     env:
-      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://api.example.invalid' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,9 +26,10 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
-      - name: Validate production API URL
+      - name: Validate production API URL for manual release builds
+        if: github.event_name == 'workflow_dispatch'
         run: |
-          if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+          if [ -z "${{ vars.NEXT_PUBLIC_API_BASE_URL }}" ]; then
             echo "Set the repository variable NEXT_PUBLIC_API_BASE_URL to the HTTPS API URL."
             exit 1
           fi
