@@ -158,8 +158,8 @@ def activate_device(
         DeviceActivation.device_id == payload.device_id,
     ))
     if device is None:
-        active_devices = db.scalar(select(DeviceActivation).where(DeviceActivation.user_id == user.id).with_for_update())
-        if len(active_devices or []) >= settings.max_active_devices:
+        active_devices = db.scalars(select(DeviceActivation).where(DeviceActivation.user_id == user.id).with_for_update()).all()
+        if len(active_devices) >= settings.max_active_devices:
             raise HTTPException(status_code=409, detail="已达到设备数量上限，请先在账号中心解除旧设备")
         db.add(DeviceActivation(
             user_id=user.id, device_id=payload.device_id,
