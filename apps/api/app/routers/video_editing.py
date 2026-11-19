@@ -85,7 +85,7 @@ def create_project(payload: ProjectCreate, user=Depends(require_active_license),
 
 
 @router.get("/projects")
-def list_projects(user=Depends(get_current_user), db: Session = Depends(get_db)):
+def list_projects(user=Depends(require_active_license), db: Session = Depends(get_db)):
     projects = db.scalars(select(VideoEditProject).where(
         VideoEditProject.user_id == user.id
     ).order_by(desc(VideoEditProject.updated_at)).limit(100)).all()
@@ -100,7 +100,7 @@ def list_projects(user=Depends(get_current_user), db: Session = Depends(get_db))
 
 
 @router.get("/projects/{project_id}")
-def get_project(project_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def get_project(project_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
     project = _project(db, project_id, user.id)
     sources = db.scalars(select(VideoEditSource).where(
         VideoEditSource.project_id == project.id, VideoEditSource.user_id == user.id
@@ -151,7 +151,7 @@ def attach_source(project_id: int, payload: SourceAttach,
 
 
 @router.get("/projects/{project_id}/timeline")
-def get_timeline(project_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def get_timeline(project_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
     _project(db, project_id, user.id)
     timeline = db.scalar(select(VideoEditTimeline).where(
         VideoEditTimeline.project_id == project_id, VideoEditTimeline.user_id == user.id
