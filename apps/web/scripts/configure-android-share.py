@@ -74,10 +74,13 @@ public class ShareReceiverPlugin extends Plugin {
                 if (uri != null) uris.add(uri);
             }
         }
-        Uri single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-        if (single != null) uris.add(single);
-        ArrayList<Uri> multiple = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-        if (multiple != null) uris.addAll(multiple);
+        if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            Uri single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (single != null) uris.add(single);
+        } else {
+            ArrayList<Uri> multiple = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (multiple != null) uris.addAll(multiple);
+        }
 
         JSArray files = new JSArray();
         try {
@@ -132,18 +135,25 @@ public class ShareReceiverPlugin extends Plugin {
             call.reject("Invalid shared-file chunk request");
             return;
         }
-        File file = new File(path);
-        try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
-            if (!file.isFile() || (long) offset + length > file.length()) {
+        try {
+            File allowedFolder = new File(getContext().getCacheDir(), "incoming-share").getCanonicalFile();
+            File file = new File(path).getCanonicalFile();
+            if (!file.getPath().startsWith(allowedFolder.getPath() + File.separator) || !file.isFile()
+                || (long) offset + length > file.length()) {
+                call.reject("Shared-file path or chunk is invalid");
+                return;
+            }
+            try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
                 call.reject("Shared-file chunk is outside the file");
                 return;
             }
-            byte[] bytes = new byte[length];
-            input.seek(offset);
-            input.readFully(bytes);
-            JSObject result = new JSObject();
-            result.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
-            call.resolve(result);
+                byte[] bytes = new byte[length];
+                input.seek(offset);
+                input.readFully(bytes);
+                JSObject result = new JSObject();
+                result.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+                call.resolve(result);
+            }
         } catch (Exception error) {
             call.reject(error.getMessage() == null ? "Unable to read shared-file chunk" : error.getMessage(), error);
         }
