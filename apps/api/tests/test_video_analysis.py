@@ -30,9 +30,9 @@ def teardown_module():
     Base.metadata.drop_all(bind=engine)
 
 
-def _account(client):
+def _account(client, email):
     registered = client.post("/api/v1/auth/register", json={
-        "email": "video-analysis@example.com", "password": "a-very-secure-password"
+        "email": email, "password": "a-very-secure-password"
     })
     assert registered.status_code == 201
     headers = {"X-CSRF-Token": registered.json()["csrf_token"], "Origin": "http://localhost:3000"}
@@ -82,7 +82,7 @@ def test_extract_keyframes_creates_unapproved_image_assets(tmp_path, monkeypatch
 
     monkeypatch.setattr(video_analysis.subprocess, "run", fake_run)
     with TestClient(app, base_url="http://localhost:3000") as client:
-        headers = _account(client)
+        headers = _account(client, "video-keyframes@example.com")
         project_id, source_id = _source(client, headers, monkeypatch)
         response = client.post(
             f"/api/v1/video-editing/projects/{project_id}/sources/{source_id}/keyframes?interval_seconds=5",
@@ -108,7 +108,7 @@ def test_export_saved_video_timeline_to_mp4(tmp_path, monkeypatch):
 
     monkeypatch.setattr(video_analysis.subprocess, "run", fake_run)
     with TestClient(app, base_url="http://localhost:3000") as client:
-        headers = _account(client)
+        headers = _account(client, "video-export@example.com")
         project_id, source_id = _source(client, headers, monkeypatch)
         saved = client.put(f"/api/v1/video-editing/projects/{project_id}/timeline",
             headers=headers, json={"expected_revision": 0, "tracks": [{
