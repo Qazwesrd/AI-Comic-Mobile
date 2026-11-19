@@ -101,7 +101,7 @@ def _get_upload(db: Session, upload_id: str, user_id: int) -> UploadSession:
 @router.post("/uploads/init")
 def init_upload(
     payload: UploadInitIn, request: Request,
-    user=Depends(get_current_user), db: Session = Depends(get_db),
+    user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     enforce_rate_limit(db, f"upload-init:{user.id}:{request_fingerprint(request)}", 30, 3600)
     if payload.size_bytes > settings.max_upload_bytes:
@@ -150,7 +150,7 @@ def init_upload(
 async def upload_chunk(
     upload_id: str, chunk_index: int, request: Request,
     x_chunk_sha256: str = Header(default=""),
-    user=Depends(get_current_user), db: Session = Depends(get_db),
+    user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     session = _get_upload(db, upload_id, user.id)
     enforce_rate_limit(db, f"upload-chunk:{user.id}:{upload_id}", session.total_chunks * 3, 3600)
