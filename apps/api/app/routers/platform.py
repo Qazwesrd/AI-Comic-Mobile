@@ -39,10 +39,12 @@ def require_active_license(user: User = Depends(get_current_user), db: Session =
     if settings.require_email_verification and not user.email_verified:
         raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
-    if record is None or not record.trial_started_at:
+    if record is None:
         raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
     if record.permanent:
         return user
+    if not record.trial_started_at:
+        raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
     started = record.trial_started_at
     if started.tzinfo is None:
         started = started.replace(tzinfo=timezone.utc)
