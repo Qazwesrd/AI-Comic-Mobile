@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import hmac
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -10,7 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import DeviceActivation, License, User, UserSession, utc_now
 from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, LicenseOut, UserOut
-from ..security import create_session_token, hash_csrf_token, hash_password, verify_password
+from ..security import create_session_token, decode_session_token, hash_csrf_token, hash_password, verify_password
 
 router = APIRouter(prefix="/api/v1", tags=["accounts"])
 
@@ -81,16 +83,15 @@ def login(payload: CredentialsIn, response: Response, db: Session = Depends(get_
 
 @router.get("/auth/csrf", response_model=CsrfOut)
 def csrf(request: Request, response: Response, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CsrfOut:
-    cookie_token = request.cookies.get(settings.csrf_cookie_name)
-    if cookie_token:
-        return CsrfOut(csrf_token=cookie_token)
-    token = __import__("secrets").token_urlsafe(32)
     session_token = request.cookies.get(settings.session_cookie_name, "")
-    from ..security import decode_session_token
     _, jti = decode_session_token(session_token)
     session = db.scalar(select(UserSession).where(UserSession.jti == jti, UserSession.user_id == user.id))
     if session is None:
         raise HTTPException(status_code=401, detail="登录已失效")
+    cookie_token = request.cookies.get(settings.csrf_cookie_name, "")
+    if cookie_token and hmac.compare_digest(hash_csrf_token(cookie_token), session.csrf_token_hash):
+        return CsrfOut(csrf_token=cookie_token)
+    token = secrets.token_urlsafe(32)
     session.csrf_token_hash = hash_csrf_token(token)
     db.commit()
     response.set_cookie(
@@ -106,7 +107,6 @@ def csrf(request: Request, response: Response, user: User = Depends(get_current_
 def logout(request: Request, response: Response, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, str]:
     token = request.cookies.get(settings.session_cookie_name, "")
     if token:
-        from ..security import decode_session_token
         try:
             _, jti = decode_session_token(token)
             session = db.scalar(select(UserSession).where(UserSession.jti == jti, UserSession.user_id == user.id))
