@@ -9,6 +9,7 @@ type Project = { id:number; title:string; description:string; aspect_ratio:strin
 type Asset = { id:number; asset_type:string; title:string; file_name:string; size_bytes:number };
 type Source = { id:number; asset_id:number; title:string; file_name:string; duration_ms:number|null; probe_status:string };
 type Clip = { id:string; source_id:number; start_ms:number; end_ms:number; position_ms:number; volume:number; transition:"none"|"fade"|"dissolve" };
+type Subtitle = { id:string; start_ms:number; end_ms:number; text:string };
 type Plan = { id:number; summary:string; limitations:string[]; clips:{source_id:number;start_ms:number;end_ms:number;position_ms:number;reason:string}[] };
 
 export default function VideoEditingPage() {
@@ -25,6 +26,11 @@ export default function VideoEditingPage() {
   const [instruction,setInstruction]=useState("");
   const [plan,setPlan]=useState<Plan|null>(null);
   const [clips,setClips]=useState<Clip[]>([]);
+  const [subtitles,setSubtitles]=useState<Subtitle[]>([]);
+  const [subtitleText,setSubtitleText]=useState("");
+  const [subtitleStart,setSubtitleStart]=useState(0);
+  const [subtitleEnd,setSubtitleEnd]=useState(3000);
+  const [exportSubtitleAssetId,setExportSubtitleAssetId]=useState<number|null>(null);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
   const [revision,setRevision]=useState(0);
@@ -40,12 +46,12 @@ export default function VideoEditingPage() {
     if(audioResponse.ok)setAudioAssets(await audioResponse.json());
   }
   async function openProject(project:Project) {
-    setSelected(project);setPlan(null);setClips([]);
+    setSelected(project);setPlan(null);setClips([]);setSubtitles([]);
     const response=await fetch(API+"/api/v1/video-editing/projects/"+project.id,{credentials:"include"});
     if(!response.ok){setMessage("读取剪辑项目失败");return;}
     const data=await response.json();setSources(data.sources||[]);setRevision(data.revision||0);
     const timeline=await fetch(API+"/api/v1/video-editing/projects/"+project.id+"/timeline",{credentials:"include"});
-    if(timeline.ok){const value=await timeline.json();setRevision(value.revision||0);const videoTrack=value.tracks?.find((t:{type:string})=>t.type==="video");setClips(videoTrack?.clips||[]);}
+    if(timeline.ok){const value=await timeline.json();setRevision(value.revision||0);const videoTrack=value.tracks?.find((t:{type:string})=>t.type==="video");const subtitleTrack=value.tracks?.find((t:{type:string})=>t.type==="subtitle");setClips(videoTrack?.clips||[]);setSubtitles(subtitleTrack?.clips||[]);}
   }
   useEffect(()=>{void loadProjects();void loadAssets();},[]);
 
@@ -93,6 +99,7 @@ export default function VideoEditingPage() {
       const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/export",{method:"POST",credentials:"include",headers,body:JSON.stringify({resolution:selected.aspect_ratio==="9:16"?"1080x1920":selected.aspect_ratio==="1:1"?"1080x1080":"1920x1080",fps:30,music_asset_id:musicAssetId?Number(musicAssetId):null})});
       const data=await response.json();if(!response.ok)throw new Error(data.detail||"视频导出失败");
       setExportAssetId(data.asset_id);
+      setExportSubtitleAssetId(data.subtitle_asset_id ?? null);
       await loadAssets();
       setMessage("视频导出完成，成片已保存到素材库，素材编号："+data.asset_id+"。");
     }catch(e){setMessage(e instanceof Error?e.message:"视频导出失败");}
@@ -113,12 +120,17 @@ export default function VideoEditingPage() {
   function addClip(sourceId:number) {
     setClips(items=>[...items,{id:crypto.randomUUID(),source_id:sourceId,start_ms:0,end_ms:5000,position_ms:items.length?Math.max(...items.map(x=>x.position_ms+x.end_ms-x.start_ms)):0,volume:1,transition:"none"}]);
   }
+  function addSubtitle() {
+    if(!subtitleText.trim()||subtitleEnd<=subtitleStart)return;
+    setSubtitles(items=>[...items,{id:crypto.randomUUID(),start_ms:subtitleStart,end_ms:subtitleEnd,text:subtitleText.trim()}]);
+    setSubtitleText("");
+  }
   async function saveTimeline() {
     if(!selected)return;
     setBusy(true);
     try {
       const headers=await csrfHeaders();
-      const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/timeline",{method:"PUT",credentials:"include",headers,body:JSON.stringify({expected_revision:revision,tracks:[{id:"video-main",type:"video",clips}]})});
+      const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/timeline",{method:"PUT",credentials:"include",headers,body:JSON.stringify({expected_revision:revision,tracks:[{id:"video-main",type:"video",clips},{id:"subtitle-main",type:"subtitle",clips:subtitles.map(item=>({...item,source_id:null,position_ms:item.start_ms,volume:1,transition:"none"}))}]})});
       const data=await response.json();if(!response.ok)throw new Error(data.detail?.message||data.detail||"保存时间线失败");
       setRevision(data.revision);setMessage("时间线版本 "+data.revision+" 已保存。");
       await loadProjects();
@@ -170,6 +182,14 @@ export default function VideoEditingPage() {
           </div>
           <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} keyframes={sources.flatMap(source=>(keyframes[source.id]||[]).map(frame=>({...frame,source_id:source.id})))} />
           {plan&&<article className="portal-card"><strong>AI建议（草稿）</strong><p>{plan.summary}</p>{plan.limitations.map((x,i)=><p key={i}>注意：{x}</p>)}<p>建议片段：{plan.clips.length}</p><button className="account-submit" disabled={!plan.clips.length} onClick={applyPlan}>应用到时间线</button></article>}
+          <h3>字幕轨道</h3>
+          <div className="account-form">
+            <label>字幕内容<textarea rows={2} value={subtitleText} onChange={e=>setSubtitleText(e.target.value)} placeholder="输入要显示的字幕文字"/></label>
+            <label>字幕开始时间（毫秒）<input type="number" min="0" value={subtitleStart} onChange={e=>setSubtitleStart(Number(e.target.value))}/></label>
+            <label>字幕结束时间（毫秒）<input type="number" min="1" value={subtitleEnd} onChange={e=>setSubtitleEnd(Number(e.target.value))}/></label>
+            <button className="account-submit" disabled={!subtitleText.trim()||subtitleEnd<=subtitleStart} onClick={addSubtitle}>添加字幕片段</button>
+          </div>
+          {subtitles.map(item=><article className="portal-card" key={item.id}><strong>{item.text}</strong><p>{item.start_ms}ms – {item.end_ms}ms</p><button className="account-submit" onClick={()=>setSubtitles(items=>items.filter(x=>x.id!==item.id))}>删除字幕</button></article>)}
           <h3>时间线 · 版本 {revision}</h3>
           <p>可提取关键帧交给支持图片理解的 AI 客户端；视频轨道可编辑并导出 MP4，支持可选背景音乐接口。</p>
           {clips.map((clip,index)=><article className="portal-card" key={clip.id}>
@@ -178,11 +198,12 @@ export default function VideoEditingPage() {
               <label>源视频开始时间（毫秒）<input type="number" min="0" value={clip.start_ms} onChange={e=>setClips(items=>items.map(x=>x.id===clip.id?{...x,start_ms:Number(e.target.value)}:x))}/></label>
               <label>源视频结束时间（毫秒）<input type="number" min="1" value={clip.end_ms} onChange={e=>setClips(items=>items.map(x=>x.id===clip.id?{...x,end_ms:Number(e.target.value)}:x))}/></label>
               <label>时间线位置（毫秒）<input type="number" min="0" value={clip.position_ms} onChange={e=>setClips(items=>items.map(x=>x.id===clip.id?{...x,position_ms:Number(e.target.value)}:x))}/></label>
+              <label>片段淡入淡出<select value={clip.transition==="fade"?"fade":"none"} onChange={e=>setClips(items=>items.map(x=>x.id===clip.id?{...x,transition:e.target.value as "none"|"fade"}:x))}><option value="none">无</option><option value="fade">淡入淡出</option></select></label>
               <button className="account-submit" onClick={()=>setClips(items=>items.filter(x=>x.id!==clip.id))}>移除此片段</button>
             </div>
           </article>)}
           <button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void saveTimeline()}>保存时间线版本</button><button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void exportVideo()}>{busy?"处理中…":"导出 MP4 成片"}</button>
-          {exportAssetId!==null&&<article className="portal-card"><strong>最近导出的成片</strong><p>素材编号：{exportAssetId}</p><video controls playsInline style={{width:"100%",maxHeight:360}} src={API+"/api/v1/assets/"+exportAssetId+"/download"} /><a href={API+"/api/v1/assets/"+exportAssetId+"/download"}>下载 MP4 成片</a></article>}
+          {exportAssetId!==null&&<article className="portal-card"><strong>最近导出的成片</strong><p>素材编号：{exportAssetId}</p><video controls playsInline style={{width:"100%",maxHeight:360}} src={API+"/api/v1/assets/"+exportAssetId+"/download"} /><a href={API+"/api/v1/assets/"+exportAssetId+"/download"}>下载 MP4 成片</a>{exportSubtitleAssetId!==null&&<p><a href={API+"/api/v1/assets/"+exportSubtitleAssetId+"/download"}>下载 SRT 字幕文件</a></p>}</article>}
         </div>}
         <p className="account-message">{message}</p>
         <p style={{fontSize:11,color:"#8c90b2"}}>关键帧提取仅负责抽帧，不代表软件已自动理解画面；AI 视觉分析仍需通过支持图片理解的客户端或已配置视觉模型完成。MP4 导出由服务端 FFmpeg 执行，原始视频不会覆盖。</p>
