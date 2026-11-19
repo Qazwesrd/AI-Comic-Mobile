@@ -216,6 +216,29 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
         assert exported.json()["project"]["title"] == "保留数据项目"
 
 
+def test_trial_is_exactly_48_hours_even_if_environment_setting_differs(monkeypatch):
+    from datetime import timedelta
+    from app.models import Project, utc_now
+
+    monkeypatch.setattr(settings, "trial_hours", 72)
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "trial-48h-fixed@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        client.post("/api/v1/license/activate", headers=headers,
+                    json={"device_id": "trial-device-48h", "platform": "android"})
+        db = TestingSessionLocal()
+        try:
+            user = db.scalar(select(User).where(User.email == "trial-48h-fixed@example.com"))
+            db.execute(update(License).where(License.user_id == user.id).values(
+                trial_started_at=utc_now() - timedelta(hours=49)
+            ))
+            db.commit()
+        finally:
+            db.close()
+        blocked = client.post("/api/v1/projects", headers=headers, json={"title": "49小时后不能创建"})
+        assert blocked.status_code == 402
+
+
 def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
     monkeypatch.setattr(settings, "rate_limit_auth_per_minute", 1)
     with TestClient(app, base_url="http://localhost:3000") as client:
