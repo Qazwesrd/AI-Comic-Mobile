@@ -33,7 +33,7 @@
 - [路线图](docs/ROADMAP.md)
 - [视频发布集成策略](docs/PUBLISHING_INTEGRATIONS.md)
 - [试用、支付与授权规则](docs/LICENSING_AND_PAYMENTS.md)
-- [部署与外部服务配置](docs/DEPLOYMENT_AND_OPERATIONS.md)
+- [部署与外部服务配置](docs/DEPLOYMENT_AND_OPERATIONS.md)\n- [移动端构建说明](docs/MOBILE_BUILD.md)
 
 ## 当前状态
 
