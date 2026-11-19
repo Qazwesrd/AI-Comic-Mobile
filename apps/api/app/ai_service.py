@@ -24,6 +24,10 @@ async def chat_json(system_prompt: str, user_prompt: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
             response = await client.post(endpoint, headers=headers, json=payload)
+            if response.status_code == 400:
+                # Some OpenAI-compatible gateways do not implement response_format.
+                fallback_payload = {key: value for key, value in payload.items() if key != "response_format"}
+                response = await client.post(endpoint, headers=headers, json=fallback_payload)
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
