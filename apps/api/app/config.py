@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     rate_limit_email_per_hour: int = 5
     max_active_devices: int = 3
     require_email_verification: bool = False
+    ai_api_base_url: str = ""
+    ai_api_key: str = ""
+    ai_model: str = ""
+    ai_timeout_seconds: int = 120
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
