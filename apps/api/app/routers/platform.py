@@ -8,6 +8,7 @@ import secrets
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -352,8 +353,24 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
     if platform:
         query = query.where(Release.platform == platform)
     rows = db.scalars(query.order_by(desc(Release.created_at)).limit(30)).all()
-    return [{"platform": r.platform, "version": r.version, "download_url": r.download_url,
+    return [{"release_id": r.id, "platform": r.platform, "version": r.version,
              "notes": r.notes, "minimum_supported_version": r.minimum_supported_version} for r in rows]
+
+
+@router.get("/releases/{release_id}/download")
+def download_release(
+    release_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    license_record = db.scalar(select(License).where(License.user_id == user.id))
+    if license_record is None or not license_record.permanent:
+        raise HTTPException(status_code=403, detail="此正式版下载仅对已获得永久授权的账号开放")
+    release = db.scalar(select(Release).where(Release.id == release_id, Release.published.is_(True)))
+    if release is None:
+        raise HTTPException(status_code=404, detail="版本不存在或已下架")
+    if not release.download_url.startswith("https://"):
+        raise HTTPException(status_code=503, detail="该版本下载地址尚未安全配置")
+    audit(db, "release_download_authorized", "release", str(release.id), user.id)
+    return RedirectResponse(url=release.download_url, status_code=302)
 
 
 @router.post("/admin/products")
