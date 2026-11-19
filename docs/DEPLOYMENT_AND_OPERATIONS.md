@@ -28,6 +28,21 @@
 - AI_API_BASE_URL 应指向兼容 OpenAI Chat Completions 的服务地址（通常以 /v1 结尾），并设置 AI_API_KEY 与 AI_MODEL。密钥只放服务端环境变量。
 - 配置数据库备份、日志脱敏、告警和密钥轮换。
 
+## Gmail API 邮件发送配置
+
+1. 在 Google Cloud Console 创建项目并启用 Gmail API。
+2. 配置 OAuth 同意屏幕，添加发送账号作为测试用户（如果界面要求）。
+3. 创建 OAuth 2.0 客户端，选择适合服务端使用的 Web application 类型。
+4. 授权时只申请 `https://www.googleapis.com/auth/gmail.send`，并请求离线访问（offline），以取得 refresh token。
+5. 使用授权返回的 Client ID、Client Secret、Refresh Token，以及同一个 Gmail 发件地址，设置 Render 环境变量：
+   - `GMAIL_CLIENT_ID`
+   - `GMAIL_CLIENT_SECRET`
+   - `GMAIL_REFRESH_TOKEN`
+   - `GMAIL_SENDER_EMAIL`
+6. OAuth 应用若保持 External / Testing，Google 会把此类 refresh token 限制为 7 天有效；正式长期运行前必须处理发布状态与 Google 对敏感 Gmail scope 的验证要求。不要把 OAuth 密钥或 refresh token 放入 GitHub、前端代码或聊天消息。
+
+Gmail API 使用 HTTPS，不受 Render Free 的 SMTP 端口限制。此方式使用项目所有者的 Gmail 发件账号发送验证码，适合低频事务邮件；它不是面向大规模群发的邮件平台。Google 将 `gmail.send` 标记为敏感权限，公开应用需遵守 OAuth 验证要求。
+
 ## 邮件安全
 
 注册验证码为 6 位数字、有效期 10 分钟，只保存带 TOKEN_PEPPER 的 HMAC 摘要，验证成功后一次性失效；同一邮箱重新申请验证码会使旧验证码失效。验证码发送与验证均有限流。邮件通过 Gmail API HTTPS 发送，使用独立 OAuth 客户端和 gmail.send 最小权限；不要把 OAuth 客户端密钥或刷新令牌提交到 Git。
