@@ -60,7 +60,11 @@ def register(payload: CredentialsIn, request: Request, response: Response, db: S
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=409, detail="该邮箱已注册")
-    user = User(email=payload.email, password_hash=hash_password(payload.password))
+    bootstrap_admins = {item.strip().lower() for item in settings.admin_bootstrap_emails.split(",") if item.strip()}
+    user = User(
+        email=payload.email, password_hash=hash_password(payload.password),
+        is_admin=payload.email in bootstrap_admins,
+    )
     db.add(user)
     try:
         db.flush()
@@ -154,6 +158,9 @@ def activate_device(
         DeviceActivation.device_id == payload.device_id,
     ))
     if device is None:
+        active_devices = db.scalar(select(DeviceActivation).where(DeviceActivation.user_id == user.id).with_for_update())
+        if len(active_devices or []) >= settings.max_active_devices:
+            raise HTTPException(status_code=409, detail="已达到设备数量上限，请先在账号中心解除旧设备")
         db.add(DeviceActivation(
             user_id=user.id, device_id=payload.device_id,
             platform=payload.platform.strip().lower() or "unknown",
