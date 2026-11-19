@@ -210,12 +210,12 @@ def complete_upload(
         db.delete(session)
         db.commit()
         db.refresh(asset)
-        audit(db, "media_asset_uploaded", "media_asset", str(asset.id), user.id)
     except Exception:
         db.rollback()
         destination.unlink(missing_ok=True)
         raise
     shutil.rmtree(folder, ignore_errors=True)
+    audit(db, "media_asset_uploaded", "media_asset", str(asset.id), user.id)
     return {"id": asset.id, "asset_uuid": asset.asset_uuid, "asset_type": asset.asset_type,
             "title": asset.title, "file_name": asset.file_name, "size_bytes": asset.size_bytes,
             "sha256": asset.sha256, "approved": asset.approved}
