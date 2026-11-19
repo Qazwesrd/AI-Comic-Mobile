@@ -72,7 +72,7 @@ class OneTimeToken(Base):
 
 class RateLimitBucket(Base):
     __tablename__ = "rate_limit_buckets"
-    __table_args__ = (Index("ix_rate_limit_key_window", "bucket_key", "window_start"),)
+    __table_args__ = (UniqueConstraint("bucket_key", "window_start", name="uq_rate_limit_bucket"), Index("ix_rate_limit_key_window", "bucket_key", "window_start"))
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     bucket_key: Mapped[str] = mapped_column(String(128), nullable=False)
     window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
