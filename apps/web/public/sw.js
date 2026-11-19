@@ -1,5 +1,5 @@
 const CACHE_NAME = "ai-comic-mobile-shell-v1";
-const SHELL = ["/", "/account/", "/projects/", "/publishing/", "/store/", "/notices/", "/downloads/", "/icon.svg", "/manifest.webmanifest"];
+const SHELL = ["/", "/account/", "/projects/", "/assets/", "/publishing/", "/store/", "/notices/", "/downloads/", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));

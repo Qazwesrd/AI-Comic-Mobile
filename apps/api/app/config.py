@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = ""
     ai_timeout_seconds: int = 120
+    media_root: str = "./storage/media"
+    max_upload_bytes: int = 2147483648
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
