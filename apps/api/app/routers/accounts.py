@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/v1", tags=["accounts"])
 def _cookie_options() -> dict:
     return {
         "httponly": True,
-        "secure": settings.app_env == "production",
+        "secure": settings.app_env.lower() == "production",
         "samesite": settings.session_cookie_samesite.lower(),
         "path": "/",
     }
@@ -47,7 +47,7 @@ def _issue_session(user: User, db: Session, response: Response) -> AuthOut:
         csrf_token,
         max_age=settings.access_token_minutes * 60,
         httponly=False,
-        secure=settings.app_env == "production",
+        secure=settings.app_env.lower() == "production",
         samesite=settings.session_cookie_samesite.lower(),
         path="/",
     )
@@ -114,7 +114,7 @@ def csrf(request: Request, response: Response, user: User = Depends(get_current_
     response.set_cookie(
         settings.csrf_cookie_name, token,
         max_age=settings.access_token_minutes * 60,
-        httponly=False, secure=settings.app_env == "production",
+        httponly=False, secure=settings.app_env.lower() == "production",
         samesite=settings.session_cookie_samesite.lower(), path="/",
     )
     return CsrfOut(csrf_token=token)
@@ -132,8 +132,8 @@ def logout(request: Request, response: Response, user: User = Depends(get_curren
                 db.commit()
         except Exception:
             db.rollback()
-    response.delete_cookie(settings.session_cookie_name, path="/", secure=settings.app_env == "production", httponly=True, samesite=settings.session_cookie_samesite.lower())
-    response.delete_cookie(settings.csrf_cookie_name, path="/", secure=settings.app_env == "production", httponly=False, samesite=settings.session_cookie_samesite.lower())
+    response.delete_cookie(settings.session_cookie_name, path="/", secure=settings.app_env.lower() == "production", httponly=True, samesite=settings.session_cookie_samesite.lower())
+    response.delete_cookie(settings.csrf_cookie_name, path="/", secure=settings.app_env.lower() == "production", httponly=False, samesite=settings.session_cookie_samesite.lower())
     return {"message": "已安全退出登录"}
 
 
