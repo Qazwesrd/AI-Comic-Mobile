@@ -36,6 +36,8 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+    if settings.require_email_verification and not user.email_verified:
+        raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
     if record is None or not record.trial_started_at:
         raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
@@ -250,6 +252,8 @@ async def payment_webhook(request: Request, x_payment_signature: str = Header(de
         return {"received": True, "ignored": True}
     if order.status == "paid":
         return {"received": True, "already_paid": True}
+    if order.status != "pending":
+        raise HTTPException(status_code=409, detail="订单当前状态不允许支付")
     if amount != order.amount_minor or currency != order.currency:
         raise HTTPException(status_code=409, detail="订单金额或币种不匹配")
     product = db.get(Product, order.product_id)
