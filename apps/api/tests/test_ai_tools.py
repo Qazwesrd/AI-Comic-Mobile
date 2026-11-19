@@ -55,6 +55,7 @@ def test_ai_tools_endpoint_reports_android_clients_without_exposing_secrets(monk
         assert "web_tools" not in payload
         assert "do-not-return-this-secret" not in response.text
         assert all(item["store_url"].startswith("https://") for item in payload["android_apps"])
+        assert all(item["web_url"].startswith("https://") for item in payload["android_apps"])
 
 
 def test_ai_tools_endpoint_requires_login():
