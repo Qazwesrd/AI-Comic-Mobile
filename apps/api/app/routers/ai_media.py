@@ -78,6 +78,8 @@ async def generate_story_entity_image(
     entity = db.scalar(select(StoryEntity).where(StoryEntity.id == entity_id, StoryEntity.novel_id == novel_id))
     if project is None or novel is None or entity is None:
         raise HTTPException(status_code=404, detail="项目、小说或识别素材不存在")
+    if not entity.approved:
+        raise HTTPException(status_code=409, detail="请先审核并确认该人物、场景或道具，再生成视觉参考图")
 
     style = STYLE_LABELS[payload.style]
     if entity.entity_type == "character":
