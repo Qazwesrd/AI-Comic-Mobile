@@ -12,6 +12,7 @@ from ..ai_service import chat_json
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import MediaAsset, VideoEditPlan, VideoEditProject, VideoEditSource, VideoEditTimeline
+from ..media_probe import probe_video
 from ..security_services import enforce_rate_limit, request_fingerprint
 from .platform import require_active_license
 
@@ -133,7 +134,15 @@ def attach_source(project_id: int, payload: SourceAttach,
     ))
     if existing:
         return {"id": existing.id, "asset_id": asset.id, "message": "该视频已添加"}
-    source = VideoEditSource(project_id=project.id, user_id=user.id, asset_id=asset.id)
+    metadata = probe_video(asset.storage_path)
+    source = VideoEditSource(
+        project_id=project.id, user_id=user.id, asset_id=asset.id,
+        duration_ms=metadata["duration_ms"] if metadata else None,
+        width=metadata["width"] if metadata else None,
+        height=metadata["height"] if metadata else None,
+        fps=metadata["fps"] if metadata else None,
+        probe_status="ready" if metadata else "unavailable",
+    )
     db.add(source)
     db.commit()
     db.refresh(source)
