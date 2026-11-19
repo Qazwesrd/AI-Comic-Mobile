@@ -2,7 +2,7 @@
 
 ## 阶段 1：项目基础（已完成）
 - [x] 独立仓库与产品边界文档
-- [x] Android + iPhone 首期交付策略
+- [x] Android 优先首期交付策略；iOS 暂缓
 - [x] 明确独立 AI 视频剪辑工作台的产品范围（已由后续需求更新）
 - [x] 首批发布平台限定抖音、红果短剧、快手
 - [x] Next.js / FastAPI 工程骨架与质量检查工作流
@@ -41,6 +41,17 @@
 - [ ] 完整手机创作界面与真实 AI 服务联调
 
 
+## 阶段 3A：Android 双模式 AI 工具接入（客户端启动第一批已提交）
+- [x] 软件内置文本/图片/语音 API 配置状态查询（部署环境变量）
+- [x] Android 客户端目录：ChatGPT、DeepSeek、Claude、豆包、即梦 AI、CapCut（包名已核实）
+- [x] Capacitor App Launcher 检测和启动 Android 已安装客户端
+- [x] Android 11+ 仅声明五个已核实客户端的 package visibility
+- [x] 漫剧与独立 AI 视频剪辑共用双模式入口、提示词复制和素材导入流程
+- [ ] 剪映/CapCut、可灵、Runway 等客户端逐一核实包名与官方启动能力后再接入
+- [ ] 账号级 AI 服务商自助配置、密钥加密保存和密钥不回显
+- [ ] 模型连通性测试、供应商预设、费用确认与调用日志
+- [ ] 系统分享接收、文件导入助手、素材识别和自动关联建议
+
 ## 阶段 3B：AI 视频剪辑工作台（本阶段新增，开发中）
 - [x] 独立剪辑项目与原始视频素材管理（不依赖漫剧项目）
 - [x] 复用私有素材库的大文件分片上传；新增 FFprobe 时长/分辨率/帧率探测（缩略图/波形待做）
@@ -65,11 +76,10 @@
 
 ## 阶段 5：移动端构建与发布
 - [x] PWA manifest、离线壳、service worker、科技风 SVG 图标
-- [ ] iPhone Safari 真机验证
-- [x] Capacitor Android/iOS 工程配置与 Android Debug APK 构建工作流
+- [x] Capacitor Android 工程配置与 Android Debug APK 构建工作流
 - [ ] Android release 签名、APK/AAB 发布和升级流程
-- [ ] Android/iOS 权限、弱网、媒体上传续传测试
-- [ ] 安全、隐私、支付和授权验收
+- [ ] Android 权限、弱网、媒体上传续传测试
+- [ ] Android 安全、隐私、支付和授权验收
 - [ ] 正式下载站与版本文件存储
 
 ## 阶段 6：上线准备

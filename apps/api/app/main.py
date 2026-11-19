@@ -12,6 +12,7 @@ from .routers.assets import router as assets_router
 from .routers.renders import router as renders_router
 from .routers.ai_media import router as ai_media_router
 from .routers.video_editing import router as video_editing_router
+from .routers.ai_tools import router as ai_tools_router
 
 
 @asynccontextmanager
@@ -52,6 +53,7 @@ app.include_router(assets_router)
 app.include_router(renders_router)
 app.include_router(ai_media_router)
 app.include_router(video_editing_router)
+app.include_router(ai_tools_router)
 
 
 @app.get("/health", tags=["system"])
