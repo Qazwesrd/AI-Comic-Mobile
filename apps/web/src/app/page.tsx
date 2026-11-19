@@ -1,7 +1,7 @@
 const modules = [
   { number: "01", title: "小说导入", detail: "创建项目、导入文本并自动拆分章节", status: "已接入", href: "/projects" },
   { number: "02", title: "项目工作区", detail: "查看和管理你的小说漫剧项目", status: "创作流程", href: "/projects" },
-  { number: "03", title: "AI 工具中心", detail: "选择软件内置 AI 接口或打开网页版 AI 工具", status: "双模式接入", href: "/ai-tools" },
+  { number: "03", title: "AI 工具中心", detail: "内置 AI API 或启动手机已安装的 AI 客户端", status: "双模式接入", href: "/ai-tools" },
   { number: "04", title: "AI 视频剪辑", detail: "上传原视频，通过文字指令规划和编辑时间线", status: "独立剪辑工作台", href: "/video-editing" },
   { number: "05", title: "发布中心", detail: "准备抖音、红果短剧和快手发布资料", status: "官方授权优先", href: "/publishing" },
   { number: "06", title: "永久授权", detail: "购买永久使用授权与查询订单", status: "账号服务", href: "/store" },
@@ -27,7 +27,7 @@ export default function HomePage() {
         <p className="hero-copy">从小说解析到分镜生成，再到漫剧成片与平台发布。<br />把复杂创作流程，装进你的手机。</p>
         <div className="hero-actions">
           <a className="primary-action" href="#modules">进入创作工作台 <span>↗</span></a>
-          <span className="platform-note">ANDROID · IPHONE · PWA</span>
+          <span className="platform-note">ANDROID · ANDROID FIRST</span>
         </div>
       </section>
 
