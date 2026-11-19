@@ -21,8 +21,6 @@ def upgrade():
 
 
 def downgrade():
-    with op.batch_alter_table("users") as batch:
-        batch.drop_index("ix_users_phone")
-        batch.drop_column("phone_verified")
-        batch.drop_column("phone")
-        batch.alter_column("email", existing_type=sa.String(length=320), nullable=False)
+    # Phone-only accounts cannot be represented by the previous schema.
+    # Keep their identity data rather than destructively removing these columns.
+    pass
