@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, engine
 from .routers.accounts import router as accounts_router
+from .routers.platform import router as platform_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # create_all is retained for the early prototype; production must use migrations.
-    Base.metadata.create_all(bind=engine)
+    # Development convenience only. Production schema changes must be applied with Alembic.
+    if settings.app_env.lower() == "development":
+        Base.metadata.create_all(bind=engine)
     yield
 
 
@@ -41,6 +43,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 app.include_router(accounts_router)
+app.include_router(platform_router)
 
 
 @app.get("/health", tags=["system"])
