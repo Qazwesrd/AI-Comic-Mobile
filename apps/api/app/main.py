@@ -10,6 +10,7 @@ from .routers.accounts import router as accounts_router
 from .routers.platform import router as platform_router
 from .routers.assets import router as assets_router
 from .routers.renders import router as renders_router
+from .routers.ai_media import router as ai_media_router
 
 
 @asynccontextmanager
@@ -48,6 +49,7 @@ app.include_router(accounts_router)
 app.include_router(platform_router)
 app.include_router(assets_router)
 app.include_router(renders_router)
+app.include_router(ai_media_router)
 
 
 @app.get("/health", tags=["system"])

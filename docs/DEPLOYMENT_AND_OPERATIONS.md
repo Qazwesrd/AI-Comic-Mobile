@@ -64,3 +64,11 @@
 - 合成接口把用户选择的图片按顺序和时长拼接为 MP4，可选循环背景音，支持横屏 16:9 与竖屏 9:16。
 - 这是静帧分镜预览合成，不是 AI 动态视频生成，也不包含字幕烧录、转场动画或复杂时间线编辑。
 - 当前任务由 FastAPI BackgroundTasks 在 API 进程内执行；进程重启可能中断任务。生产环境应迁移到 Celery/RQ 等持久化任务队列，并配置 CPU/内存/时长配额。
+
+
+## AI 图片与配音服务
+
+- IMAGE_API_BASE_URL、IMAGE_API_KEY、IMAGE_MODEL：需要兼容 OpenAI Images Generations 格式的图像服务。服务端会请求 /images/generations，支持返回 base64 或 HTTPS 图片 URL。
+- AUDIO_API_BASE_URL、AUDIO_API_KEY、AUDIO_MODEL：需要兼容 OpenAI Audio Speech 格式的语音服务。服务端会请求 /audio/speech 并保存 MP3。
+- 图片生成支持人物三视图参考图、场景概念图和道具三视图；生成结果先进入私有素材库，用户仍需人工审核。
+- 不同厂商对图片/语音 API 的兼容程度不同；配置前应以对应厂商文档确认 endpoint、模型名、尺寸、语音和返回格式。未配置时 API 明确返回 503，不会假装生成成功。

@@ -547,7 +547,7 @@ def list_story_entities(
     rows = db.scalars(select(StoryEntity).where(StoryEntity.novel_id == novel_id).order_by(StoryEntity.entity_type, StoryEntity.canonical_name)).all()
     return [{"id": e.id, "entity_uuid": e.entity_uuid, "type": e.entity_type,
              "name": e.canonical_name, "description": e.description,
-             "attributes": json.loads(e.attributes_json), "approved": e.approved} for e in rows]
+             "attributes": json.loads(e.attributes_json), "approved": e.approved, "visual_asset_id": e.visual_asset_id} for e in rows]
 
 
 @router.patch("/projects/{project_id}/novels/{novel_id}/entities/{entity_id}")

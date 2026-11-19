@@ -215,6 +215,7 @@ class StoryEntity(Base):
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     attributes_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    visual_asset_id: Mapped[int | None] = mapped_column(ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
