@@ -18,6 +18,8 @@ export default function AccountPage() {
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [license, setLicense] = useState<License | null>(null);
@@ -72,22 +74,42 @@ export default function AccountPage() {
     setMessage("");
     setSuccess(false);
     try {
-      const response = await fetch(`${API}/api/v1/auth/${mode === "register" ? "register" : "login"}`, {
+      const endpoint = mode === "login"
+        ? "/api/v1/auth/login"
+        : codeSent
+          ? "/api/v1/auth/register/verify"
+          : "/api/v1/auth/register";
+      const body = mode === "login"
+        ? { email, password }
+        : codeSent
+          ? { email, code: verificationCode }
+          : { email, password };
+      const response = await fetch(`${API}${endpoint}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
-      const data = await response.json();
+      const data = await response.json() as { detail?: string; message?: string; csrf_token?: string };
       if (!response.ok) throw new Error(data.detail || "操作失败，请检查输入");
+
+      if (mode === "register" && !codeSent) {
+        setCodeSent(true);
+        setMessage(data.message || "验证码已发送，请查收邮箱。");
+        setSuccess(true);
+        return;
+      }
+
       const csrf = String(data.csrf_token || "");
       if (!csrf) throw new Error("安全会话建立失败，请重试");
       setCsrfToken(csrf);
       await loadLicense(csrf);
       await loadDevices();
       setSuccess(true);
-      setMessage("登录成功，账号与试用状态已连接。");
+      setMessage(mode === "register" ? "邮箱验证成功，账号创建完成。" : "登录成功，账号与试用状态已连接。");
       setPassword("");
+      setVerificationCode("");
+      setCodeSent(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "网络连接失败");
     } finally {
@@ -105,17 +127,25 @@ export default function AccountPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "解除设备失败"); setSuccess(false); }
   }
 
-  async function sendVerification() {
+  async function resendRegistrationCode() {
+    setBusy(true);
+    setMessage("");
+    setSuccess(false);
     try {
-      const response = await fetch(`${API}/api/v1/auth/email/verify/request`, {
-        method: "POST", credentials: "include", headers: { "X-CSRF-Token": csrfToken }
+      const response = await fetch(`${API}/api/v1/auth/register/resend-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
       });
-      const data = await response.json();
-      setMessage(response.ok ? data.message : data.detail || "发送失败");
-      setSuccess(response.ok);
-    } catch {
-      setMessage("暂时无法发送验证邮件");
+      const data = await response.json() as { detail?: string; message?: string };
+      if (!response.ok) throw new Error(data.detail || "验证码发送失败");
+      setMessage(data.message || "新的验证码已发送。");
+      setSuccess(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "验证码发送失败");
       setSuccess(false);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -158,13 +188,19 @@ export default function AccountPage() {
           {!license && (
             <>
               <div className="account-tabs">
-                <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>创建账号</button>
-                <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>登录账号</button>
+                <button type="button" className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>创建账号</button>
+                <button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>登录账号</button>
               </div>
               <form className="account-form" onSubmit={submit}>
-                <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                <label>邮箱地址<input type="email" autoComplete="email" required value={email} disabled={mode === "register" && codeSent} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                 <label>密码（至少10位）<input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={10} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入至少10位密码" /></label>
-                <button className="account-submit" disabled={busy}>{busy ? "正在连接…" : mode === "register" ? "注册并开始试用" : "登录并查看授权"}</button>
+                {mode === "register" && codeSent && (
+                  <label>邮箱验证码<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="请输入邮箱收到的6位数字验证码" /></label>
+                )}
+                <button className="account-submit" disabled={busy}>{busy ? "正在处理…" : mode === "register" ? codeSent ? "验证并创建账号" : "获取邮箱验证码" : "登录并查看授权"}</button>
+                {mode === "register" && codeSent && (
+                  <button type="button" className="account-submit" disabled={busy} onClick={() => void resendRegistrationCode()}>重新发送验证码</button>
+                )}
               </form>
               <a className="account-back" href="/forgot-password">忘记密码？点击找回</a>
             </>
@@ -174,7 +210,6 @@ export default function AccountPage() {
             <div className="account-status">
               <strong>{license.message}</strong><br />
               <h3>已绑定设备（最多3台）</h3>{devices.map(device => <div className="portal-card" key={device.device_id}><strong>{device.platform}</strong><small>{device.device_id}</small><button type="button" className="account-submit" onClick={() => void removeDevice(device.device_id)}>解除此设备</button></div>)}<br />
-              <button type="button" className="account-submit" onClick={() => void sendVerification()}>发送邮箱验证邮件</button><br />
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
               {license.status === "expired" && "请前往官网购买永久授权。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
