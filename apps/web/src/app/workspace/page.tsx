@@ -31,16 +31,15 @@ export default function WorkspacePage() {
       .then(async response => {
         if (response.status === 401) {
           if (active) setSignedIn(false);
-          return [];
+          return null;
         }
         if (!response.ok) throw new Error(`读取项目失败（HTTP ${response.status}）`);
         return await response.json() as Project[];
       })
       .then(rows => {
-        if (active) {
-          setSignedIn(true);
-          setProjects(rows.slice(0, 4));
-        }
+        if (!active || rows === null) return;
+        setSignedIn(true);
+        setProjects(rows.slice(0, 4));
       })
       .catch(error => {
         if (active) {
