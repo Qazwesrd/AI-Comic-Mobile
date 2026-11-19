@@ -1,7 +1,9 @@
 "use client";
+
+import { getApiBaseUrl } from "../../lib/api-base";
 import { FormEvent,useEffect,useState } from "react";
 import { csrfHeaders } from "../../lib/api";
-const API=process.env.NEXT_PUBLIC_API_BASE_URL||"http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 type Job={id:number;platform:string;title:string;status:string;last_error:string|null};
 export default function PublishingPage(){const [platform,setPlatform]=useState("douyin");const [title,setTitle]=useState("");const [description,setDescription]=useState("");const [media,setMedia]=useState("");const [jobs,setJobs]=useState<Job[]>([]);const [message,setMessage]=useState("");
 async function load(){try{const r=await fetch(`${API}/api/v1/publishing/jobs`,{credentials:"include"});if(r.ok)setJobs(await r.json());}catch{}}
