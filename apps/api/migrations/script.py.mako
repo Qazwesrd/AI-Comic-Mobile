@@ -1,23 +1,23 @@
-"""\u007bmessage\u007d
+""" ${message}
 
-Revision ID: \u007brevision\u007d
-Revises: \u007bdown_revision | comma,n\u007d
-Create Date: \u007bcreate_date\u007d
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
 
 """
 from alembic import op
 import sqlalchemy as sa
-\u007bimports if imports\u007d
+${imports if imports else ""}
 
-revision = \u007brevision\u007d
-down_revision = \u007bdown_revision\u007d
-branch_labels = \u007bbranch_labels\u007d
-depends_on = \u007bdepends_on\u007d
+revision = ${up_revision!r}
+down_revision = ${down_revision!r}
+branch_labels = ${branch_labels!r}
+depends_on = ${depends_on!r}
 
 
 def upgrade():
-    \u007bupgrades if upgrades else 'pass'\u007d
+    ${upgrades if upgrades else "pass"}
 
 
 def downgrade():
-    \u007bdowngrades if downgrades else 'pass'\u007d
+    ${downgrades if downgrades else "pass"}
