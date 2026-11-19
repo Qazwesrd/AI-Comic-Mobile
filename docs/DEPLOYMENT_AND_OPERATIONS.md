@@ -24,6 +24,7 @@
 - APP_ENV=production、HTTPS、精确 CORS_ORIGINS、WEB_ORIGIN 和 APP_BASE_URL。
 - 执行 alembic upgrade head；生产服务启动不会自动创建或修改数据库结构。
 - 配置 Gmail API OAuth 2.0 邮件发送：GMAIL_CLIENT_ID、GMAIL_CLIENT_SECRET、GMAIL_REFRESH_TOKEN、GMAIL_SENDER_EMAIL，并启用 REQUIRE_EMAIL_VERIFICATION。后端通过 HTTPS 调用 Gmail API，不使用 Render Free 禁止的 SMTP 出站端口。
+- 如需开放中国大陆手机号注册，配置阿里云号码认证服务（PNVS）短信认证：ALIBABA_CLOUD_ACCESS_KEY_ID、ALIBABA_CLOUD_ACCESS_KEY_SECRET、ALIYUN_SMS_SIGN_NAME、ALIYUN_SMS_TEMPLATE_CODE；可选 ALIYUN_SMS_SCHEME_NAME。不要把 AccessKey 写入代码或 Git。
 - 设置 ADMIN_BOOTSTRAP_EMAILS，只填写可信管理员邮箱；该邮箱首次注册或登录时被提升为管理员。
 - AI_API_BASE_URL 应指向兼容 OpenAI Chat Completions 的服务地址（通常以 /v1 结尾），并设置 AI_API_KEY 与 AI_MODEL。密钥只放服务端环境变量。
 - 配置数据库备份、日志脱敏、告警和密钥轮换。
@@ -96,3 +97,13 @@ Gmail API 使用 HTTPS，不受 Render Free 的 SMTP 端口限制。此方式使
 - 不同厂商对图片/语音 API 的兼容程度不同；配置前应以对应厂商文档确认 endpoint、模型名、尺寸、语音和返回格式。未配置时 API 明确返回 503，不会假装生成成功。
 
 - 字幕生成使用 AI_API_BASE_URL / AI_API_KEY / AI_MODEL，返回 SRT 文件并保存到素材库；字幕时间轴为模型估算，需要人工校对。
+
+
+## 中国大陆手机号注册与短信验证码
+
+- 手机号注册使用阿里云号码认证服务（PNVS）的短信认证能力，调用服务端 SendSmsVerifyCode 和 CheckSmsVerifyCode；验证码由阿里云生成并核验，应用不会把验证码明文保存到数据库。
+- 个人开发者可使用短信认证服务：需完成阿里云个人实名认证、在号码认证服务控制台开通“短信认证”，创建最小权限 RAM 用户 AccessKey，并从控制台获取系统赠送签名和验证码模板。赠送签名与模板必须配套使用。
+- Render API 环境变量：ALIBABA_CLOUD_ACCESS_KEY_ID、ALIBABA_CLOUD_ACCESS_KEY_SECRET、ALIYUN_SMS_SIGN_NAME、ALIYUN_SMS_TEMPLATE_CODE。若控制台配置了方案名称，再设置 ALIYUN_SMS_SCHEME_NAME。
+- 当前仅接受中国大陆 11 位手机号（1[3-9] 开头），短信验证码为 6 位、有效期 5 分钟；发送按手机号和 IP 限流。短信服务未配置或发送失败时，不会创建账号。
+- 手机号验证成功后才创建账号并发放 48 小时试用；手机号可用于后续密码登录。邮箱注册和既有邮箱账号保持不变。
+- 阿里云官方说明：个人用户无需企业资质、无需自定义签名和模板；验证码核验服务免费，短信按实际发送计费。具体价格和服务开通状态以阿里云控制台为准。
