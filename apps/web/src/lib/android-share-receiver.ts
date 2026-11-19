@@ -1,18 +1,29 @@
-import { convertFileSrc, registerPlugin } from "@capacitor/core";
+import { registerPlugin } from "@capacitor/core";
 
-type NativeSharedFile = { name: string; mimeType: string; size: number; path: string };
-type ShareReceiverPlugin = { getPendingShares(): Promise<{ files: NativeSharedFile[] }> };
+export type AndroidSharedFile = {
+  name: string;
+  mimeType: string;
+  size: number;
+  path: string;
+  type: string;
+};
+
+type ShareReceiverPlugin = {
+  getPendingShares(): Promise<{ files: Array<Omit<AndroidSharedFile, "type">> }>;
+  readChunk(options: { path: string; offset: number; length: number }): Promise<{ data: string }>;
+};
 
 const ShareReceiver = registerPlugin<ShareReceiverPlugin>("ShareReceiver");
 
-export async function consumeAndroidSharedFiles(): Promise<File[]> {
+export async function consumeAndroidSharedFiles(): Promise<AndroidSharedFile[]> {
   const result = await ShareReceiver.getPendingShares();
-  const files: File[] = [];
-  for (const item of result.files ?? []) {
-    const response = await fetch(convertFileSrc(item.path));
-    if (!response.ok) throw new Error(`无法读取分享文件：${item.name}`);
-    const blob = await response.blob();
-    files.push(new File([blob], item.name, { type: item.mimeType || blob.type || "application/octet-stream", lastModified: Date.now() }));
-  }
-  return files;
+  return (result.files ?? []).map(file => ({ ...file, type: file.mimeType || "application/octet-stream" }));
+}
+
+export async function readAndroidSharedChunk(file: AndroidSharedFile, offset: number, length: number): Promise<Blob> {
+  const result = await ShareReceiver.readChunk({ path: file.path, offset, length });
+  const binary = atob(result.data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: file.type });
 }
