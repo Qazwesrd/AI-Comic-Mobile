@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    gmail_sender_email: str = ""
     payment_webhook_secret: str = ""
     payment_checkout_url: str = ""
     admin_bootstrap_emails: str = ""
@@ -59,8 +63,8 @@ if settings.app_env.lower() == "production" and settings.session_cookie_samesite
     pass
 
 if settings.app_env.lower() == "production" and settings.require_email_verification:
-    if not all([settings.smtp_host, settings.smtp_from_email]):
-        raise RuntimeError("SMTP settings are required when email verification is enforced.")
+    if not all([settings.gmail_client_id, settings.gmail_client_secret, settings.gmail_refresh_token, settings.gmail_sender_email]):
+        raise RuntimeError("GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN and GMAIL_SENDER_EMAIL are required when email verification is enforced.")
 if settings.app_env.lower() == "production" and not settings.token_pepper:
     raise RuntimeError("TOKEN_PEPPER must be configured in production.")
 
