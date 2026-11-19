@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..config import settings
+from ..database import get_db
+from ..ai_config_models import AIProviderConfig
 
 router = APIRouter(prefix="/api/v1/ai-tools", tags=["ai-tools"])
 
