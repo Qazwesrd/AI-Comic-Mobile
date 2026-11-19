@@ -8,6 +8,7 @@ import secrets
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -71,6 +72,11 @@ class PasswordResetIn(TokenIn):
 
 class OrderCreateIn(BaseModel):
     product_code: str = Field(min_length=2, max_length=48)
+
+
+class ManualPaymentConfirmIn(BaseModel):
+    transaction_id: str = Field(min_length=4, max_length=128)
+    note: str = Field(default="", max_length=500)
 
 
 class ProductIn(BaseModel):
@@ -282,6 +288,39 @@ async def payment_webhook(request: Request, x_payment_signature: str = Header(de
     return {"received": True, "authorized": bool(product.grants_permanent_license)}
 
 
+@router.post("/admin/orders/{order_no}/confirm-paid")
+def admin_confirm_manual_payment(
+    order_no: str, payload: ManualPaymentConfirmIn,
+    admin: User = Depends(require_admin), db: Session = Depends(get_db),
+):
+    order = db.scalar(select(Order).where(Order.order_no == order_no))
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.status == "paid":
+        raise HTTPException(status_code=409, detail="该订单已经核验并授权，不能重复确认")
+    if order.status != "pending":
+        raise HTTPException(status_code=409, detail="订单状态不允许核验")
+    if order.amount_minor != 3000 or order.currency != "CNY":
+        raise HTTPException(status_code=409, detail="订单金额不符合30元永久授权规则")
+    product = db.get(Product, order.product_id)
+    if product is None or not product.grants_permanent_license:
+        raise HTTPException(status_code=409, detail="订单商品不是永久授权商品")
+    order.status = "paid"
+    order.provider = "manual_verified"
+    order.provider_transaction_id = payload.transaction_id.strip()
+    order.paid_at = utc_now()
+    license_record = db.scalar(select(License).where(License.user_id == order.user_id))
+    if license_record is None:
+        license_record = License(user_id=order.user_id)
+        db.add(license_record)
+    license_record.permanent = True
+    license_record.permanent_granted_at = utc_now()
+    license_record.source_order_id = order.order_no
+    db.commit()
+    audit(db, "manual_payment_verified", "order", order.order_no, admin.id)
+    return {"order_no": order.order_no, "status": "paid", "permanent_license_granted": True}
+
+
 @router.get("/devices")
 def list_devices(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     devices = db.scalars(select(DeviceActivation).where(DeviceActivation.user_id == user.id)).all()
@@ -314,8 +353,24 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
     if platform:
         query = query.where(Release.platform == platform)
     rows = db.scalars(query.order_by(desc(Release.created_at)).limit(30)).all()
-    return [{"platform": r.platform, "version": r.version, "download_url": r.download_url,
+    return [{"release_id": r.id, "platform": r.platform, "version": r.version,
              "notes": r.notes, "minimum_supported_version": r.minimum_supported_version} for r in rows]
+
+
+@router.get("/releases/{release_id}/download")
+def download_release(
+    release_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    license_record = db.scalar(select(License).where(License.user_id == user.id))
+    if license_record is None or not license_record.permanent:
+        raise HTTPException(status_code=403, detail="此正式版下载仅对已获得永久授权的账号开放")
+    release = db.scalar(select(Release).where(Release.id == release_id, Release.published.is_(True)))
+    if release is None:
+        raise HTTPException(status_code=404, detail="版本不存在或已下架")
+    if not release.download_url.startswith("https://"):
+        raise HTTPException(status_code=503, detail="该版本下载地址尚未安全配置")
+    audit(db, "release_download_authorized", "release", str(release.id), user.id)
+    return RedirectResponse(url=release.download_url, status_code=302)
 
 
 @router.post("/admin/products")

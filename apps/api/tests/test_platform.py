@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import License, Product, User
+from app.models import License, Product, Release, User
 from app.security_services import consume_one_time_token, create_one_time_token
 
 
@@ -62,6 +62,39 @@ def test_project_novel_import_and_owner_isolation():
         assert imported.json()["chapter_count"] == 2
         assert client.get("/api/v1/projects").json()[0]["title"] == "测试小说"
 
+
+
+def test_release_download_requires_permanent_license_and_hides_direct_url():
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "release-trial@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activation = client.post("/api/v1/license/activate", headers=headers,
+                                 json={"device_id": "release-test-device", "platform": "android"})
+        assert activation.status_code == 200
+        db = TestingSessionLocal()
+        release = Release(platform="android", version="1.0.0",
+                          download_url="https://downloads.example.com/app.apk",
+                          notes="测试版本", minimum_supported_version="1.0.0", published=True)
+        db.add(release)
+        db.commit()
+        db.refresh(release)
+        release_id = release.id
+        db.close()
+        public_versions = client.get("/api/v1/releases")
+        assert public_versions.status_code == 200
+        assert public_versions.json()[0]["release_id"] == release_id
+        assert "download_url" not in public_versions.json()[0]
+        denied = client.get(f"/api/v1/releases/{release_id}/download", follow_redirects=False)
+        assert denied.status_code == 403
+        db = TestingSessionLocal()
+        license_record = db.scalar(select(License).join(User).where(User.email == "release-trial@example.com"))
+        assert license_record is not None
+        license_record.permanent = True
+        db.commit()
+        db.close()
+        allowed = client.get(f"/api/v1/releases/{release_id}/download", follow_redirects=False)
+        assert allowed.status_code == 302
+        assert allowed.headers["location"] == "https://downloads.example.com/app.apk"
 
 def test_one_time_tokens_are_single_use():
     db = TestingSessionLocal()
@@ -120,6 +153,36 @@ def test_payment_webhook_rejects_invalid_signature(monkeypatch):
         response = client.post("/api/v1/payments/webhook", content=b'{"event_id":"bad"}',
                                headers={"X-Payment-Signature": "invalid"})
         assert response.status_code == 401
+
+
+def test_admin_manual_payment_confirmation_grants_only_matching_30_cny_order(monkeypatch):
+    monkeypatch.setattr(settings, "admin_bootstrap_emails", "owner@example.com")
+    monkeypatch.setattr(settings, "require_email_verification", False)
+    with TestClient(app, base_url="http://localhost:3000") as admin_client, TestClient(app, base_url="http://localhost:3000") as buyer_client:
+        admin_csrf = register(admin_client, "owner@example.com")
+        buyer_csrf = register(buyer_client, "manual-buyer@example.com")
+        admin_headers = {"X-CSRF-Token": admin_csrf, "Origin": "http://localhost:3000"}
+        buyer_headers = {"X-CSRF-Token": buyer_csrf, "Origin": "http://localhost:3000"}
+        created_product = admin_client.post("/api/v1/admin/products", headers=admin_headers, json={
+            "code": "permanent-license", "name": "永久授权", "description": "一次性授权",
+            "amount_minor": 3000, "currency": "CNY", "grants_permanent_license": True,
+        })
+        assert created_product.status_code == 200
+        order_response = buyer_client.post("/api/v1/orders", headers=buyer_headers,
+                                           json={"product_code": "permanent-license"})
+        assert order_response.status_code == 200, order_response.text
+        order_no = order_response.json()["order_no"]
+        assert order_response.json()["status"] == "pending"
+        denied = buyer_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                   headers=buyer_headers, json={"transaction_id": "wx-txn-001"})
+        assert denied.status_code == 403
+        confirmed = admin_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                      headers=admin_headers, json={"transaction_id": "wx-txn-001", "note": "到账核实"})
+        assert confirmed.status_code == 200
+        assert confirmed.json()["permanent_license_granted"] is True
+        duplicate = admin_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                      headers=admin_headers, json={"transaction_id": "wx-txn-001"})
+        assert duplicate.status_code == 409
 
 
 def test_expired_trial_blocks_writes_but_keeps_project_export():
