@@ -149,3 +149,16 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
         exported = client.get(f"/api/v1/projects/{project_id}/export")
         assert exported.status_code == 200
         assert exported.json()["project"]["title"] == "保留数据项目"
+
+
+def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
+    monkeypatch.setattr(settings, "rate_limit_auth_per_minute", 1)
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        first = client.post("/api/v1/auth/login", json={
+            "email": "unknown-user@example.com", "password": "wrong-password-long"
+        })
+        second = client.post("/api/v1/auth/login", json={
+            "email": "unknown-user@example.com", "password": "wrong-password-long"
+        })
+        assert first.status_code == 401
+        assert second.status_code == 429
