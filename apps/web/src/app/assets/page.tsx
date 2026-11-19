@@ -2,20 +2,22 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
+import { AndroidSharedFile, consumeAndroidSharedFiles, readAndroidSharedChunk } from "../../lib/android-share-receiver";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const CHUNK_SIZE = 8 * 1024 * 1024;
 type AssetType = "video" | "image" | "character" | "scene" | "prop" | "reference" | "audio" | "subtitle" | "text";
 type Asset = { id:number; project_id:number|null; asset_type:AssetType; title:string; file_name:string; mime_type:string; size_bytes:number; approved:boolean };
 type Project = { id:number; title:string; status:string };
-type QueuedFile = { file:File; assetType:AssetType };
+type UploadableFile = File | AndroidSharedFile;
+type QueuedFile = { file:UploadableFile; assetType:AssetType };
 
 const typeLabels:Record<AssetType,string> = {
   video:"视频", image:"图片", character:"人物参考图", scene:"场景参考图",
   prop:"道具参考图", reference:"参考资料", audio:"音频", subtitle:"字幕", text:"文本资料"
 };
 
-function guessType(file:File):AssetType {
+function guessType(file:Pick<UploadableFile, "name" | "type">):AssetType {
   const name=file.name.toLowerCase();
   if (/\\.(srt|vtt)$/.test(name)) return "subtitle";
   if (/\\.(txt|md|markdown|json|csv)$/.test(name)) return "text";
@@ -46,7 +48,24 @@ export default function AssetsPage() {
       if(projectResponse.ok)setProjects(await projectResponse.json());
     } catch { setMessage("无法读取素材库，请检查登录和网络"); }
   }
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    void load();
+    const receiveSharedFiles = async () => {
+      try {
+        const files = await consumeAndroidSharedFiles();
+        if (files.length) {
+          setQueue(rows => [...rows, ...files.map(file => ({ file, assetType: guessType(file) }))]);
+          setMessage("已从 Android 系统分享接收 " + files.length + " 个文件，请确认分类和项目后导入。");
+        }
+      } catch {
+        // PWA/browser mode or no pending Android share: keep the normal file-picker workflow.
+      }
+    };
+    const onNativeShare = () => { void receiveSharedFiles(); };
+    window.addEventListener("androidShareReceived", onNativeShare);
+    void receiveSharedFiles();
+    return () => window.removeEventListener("androidShareReceived", onNativeShare);
+  },[]);
 
   function chooseFiles(e:ChangeEvent<HTMLInputElement>) {
     const chosen=Array.from(e.target.files||[]);
@@ -68,7 +87,9 @@ export default function AssetsPage() {
     })});
     const data=await init.json();if(!init.ok)throw new Error(data.detail||`${file.name} 初始化上传失败`);
     for(let index=0;index<data.total_chunks;index++){
-      const part=file.slice(index*data.chunk_size,Math.min(file.size,(index+1)*data.chunk_size));
+      const start=index*data.chunk_size;
+      const end=Math.min(file.size,(index+1)*data.chunk_size);
+      const part="path" in file ? await readAndroidSharedChunk(file,start,end-start) : file.slice(start,end);
       const response=await fetch(`${API}/api/v1/uploads/${data.upload_id}/chunks/${index}`,{
         method:"PUT",credentials:"include",
         headers:{"X-CSRF-Token":headers["X-CSRF-Token"],"Content-Type":"application/octet-stream"},
@@ -137,7 +158,7 @@ export default function AssetsPage() {
         <label>从手机选择文件（支持多选）<input type="file" multiple accept="image/*,video/*,audio/*,.srt,.vtt,.txt,.md,.markdown,.json,.csv,.pdf" onChange={chooseFiles}/></label>
         <p>支持图片、视频、音频、SRT/VTT 字幕、TXT/Markdown/JSON/CSV 文本和 PDF。单文件最大2GB，采用8MB分片上传。</p>
       </div>
-      {queue.length>0&&<><h2>待导入文件（{queue.length}）</h2>{queue.map((row,index)=><article className="portal-card" key={row.file.name+row.file.lastModified+index}>
+      {queue.length>0&&<><h2>待导入文件（{queue.length}）</h2>{queue.map((row,index)=><article className="portal-card" key={row.file.name+("lastModified" in row.file?row.file.lastModified:row.file.path)+index}>
         <strong>{row.file.name}</strong><p>{(row.file.size/1024/1024).toFixed(2)} MB · 自动识别为：{typeLabels[row.assetType]}</p>
         <label>素材分类<select value={row.assetType} onChange={e=>changeQueuedType(index,e.target.value as AssetType)}>
           {Object.entries(typeLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}
