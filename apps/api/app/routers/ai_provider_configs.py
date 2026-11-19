@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..ai_config_models import AIProviderConfig, AIProviderUsageLog
 from ..ai_config_security import decrypt_api_key, encrypt_api_key
 from ..auth import get_current_user
+from .platform import require_active_license
 from ..database import get_db
 from ..security_services import enforce_rate_limit
 
@@ -55,13 +56,13 @@ def _public(item: AIProviderConfig) -> dict:
 
 
 @router.get("")
-def list_configs(user=Depends(get_current_user), db: Session = Depends(get_db)):
+def list_configs(user=Depends(require_active_license), db: Session = Depends(get_db)):
     rows = db.scalars(select(AIProviderConfig).where(AIProviderConfig.user_id == user.id).order_by(AIProviderConfig.capability)).all()
     return {"configs": [_public(row) for row in rows], "supported_capabilities": sorted(CAPABILITIES)}
 
 
 @router.put("")
-def save_config(payload: ProviderConfigIn, request: Request, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def save_config(payload: ProviderConfigIn, request: Request, user=Depends(require_active_license), db: Session = Depends(get_db)):
     enforce_rate_limit(db, f"ai-config-save:{user.id}", 20, 3600)
     row = db.scalar(select(AIProviderConfig).where(
         AIProviderConfig.user_id == user.id, AIProviderConfig.capability == payload.capability
@@ -89,7 +90,7 @@ def save_config(payload: ProviderConfigIn, request: Request, user=Depends(get_cu
 
 
 @router.delete("/{capability}")
-def delete_config(capability: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_config(capability: str, user=Depends(require_active_license), db: Session = Depends(get_db)):
     if capability not in CAPABILITIES:
         raise HTTPException(status_code=404, detail="AI 能力类型不存在")
     row = db.scalar(select(AIProviderConfig).where(
@@ -103,7 +104,7 @@ def delete_config(capability: str, user=Depends(get_current_user), db: Session =
 
 
 @router.post("/{capability}/test")
-async def test_config(capability: str, request: Request, user=Depends(get_current_user), db: Session = Depends(get_db)):
+async def test_config(capability: str, request: Request, user=Depends(require_active_license), db: Session = Depends(get_db)):
     if capability not in CAPABILITIES:
         raise HTTPException(status_code=404, detail="AI 能力类型不存在")
     enforce_rate_limit(db, f"ai-config-test:{user.id}", 10, 3600)
@@ -143,7 +144,7 @@ async def test_config(capability: str, request: Request, user=Depends(get_curren
 
 
 @router.get("/usage-logs")
-def usage_logs(user=Depends(get_current_user), db: Session = Depends(get_db)):
+def usage_logs(user=Depends(require_active_license), db: Session = Depends(get_db)):
     rows = db.scalars(select(AIProviderUsageLog).where(
         AIProviderUsageLog.user_id == user.id
     ).order_by(AIProviderUsageLog.created_at.desc()).limit(50)).all()
