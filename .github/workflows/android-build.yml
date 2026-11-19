@@ -26,6 +26,8 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
       - name: Validate production API URL for manual release builds
         if: github.event_name == 'workflow_dispatch'
         run: |
