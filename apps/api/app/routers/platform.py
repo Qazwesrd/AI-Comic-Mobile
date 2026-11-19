@@ -529,7 +529,8 @@ def review_story_entity(
         raise HTTPException(status_code=404, detail="素材记录不存在")
     changes = payload.model_dump(exclude_unset=True)
     for key, value in changes.items():
-        setattr(entity, "canonical_name" if key == "canonical_name" else key, value)
+        if value is not None:
+            setattr(entity, key, value)
     db.commit()
     return {"id": entity.id, "approved": entity.approved, "name": entity.canonical_name}
 
