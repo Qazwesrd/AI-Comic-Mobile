@@ -45,6 +45,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import com.getcapacitor.*;
+import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
