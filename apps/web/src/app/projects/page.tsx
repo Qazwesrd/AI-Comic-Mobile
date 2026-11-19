@@ -358,7 +358,7 @@ export default function ProjectsPage() {
                   ))}
                 </>
               ) : <p className="project-empty">尚未识别到素材。请先点击上方按钮运行 AI 章节解析。</p>}
-              <button type="button" className="account-submit project-next" disabled={hasMore || entities.length === 0} onClick={() => setStep(4)}>进入剧本与分镜制作 →</button>
+              <button type="button" className="account-submit project-next" disabled={hasMore || processedChapters === 0} onClick={() => setStep(4)}>进入剧本与分镜制作 →</button>
             </section>
           )}
 
