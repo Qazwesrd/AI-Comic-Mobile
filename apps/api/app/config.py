@@ -37,23 +37,23 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-if settings.app_env == "production" and settings.app_secret_key == "development-only-change-me":
+if settings.app_env.lower() == "production" and settings.app_secret_key == "development-only-change-me":
     raise RuntimeError("APP_SECRET_KEY must be configured in production.")
 
 if settings.session_cookie_samesite.lower() not in {"lax", "strict", "none"}:
     raise RuntimeError("SESSION_COOKIE_SAMESITE must be lax, strict, or none.")
 
-if settings.app_env == "production" and settings.session_cookie_samesite.lower() == "none":
+if settings.app_env.lower() == "production" and settings.session_cookie_samesite.lower() == "none":
     # SameSite=None is valid only with Secure cookies.
     pass
 
-if settings.app_env == "production" and settings.require_email_verification:
+if settings.app_env.lower() == "production" and settings.require_email_verification:
     if not all([settings.smtp_host, settings.smtp_from_email]):
         raise RuntimeError("SMTP settings are required when email verification is enforced.")
-if settings.app_env == "production" and not settings.token_pepper:
+if settings.app_env.lower() == "production" and not settings.token_pepper:
     raise RuntimeError("TOKEN_PEPPER must be configured in production.")
 
-if settings.app_env == "production" and not settings.require_email_verification:
+if settings.app_env.lower() == "production" and not settings.require_email_verification:
     raise RuntimeError("REQUIRE_EMAIL_VERIFICATION must be enabled in production.")
 
 if settings.app_env.lower() == "production":
