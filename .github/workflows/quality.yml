@@ -18,6 +18,8 @@ jobs:
         run: pip install -r apps/api/requirements.txt
       - name: Compile API
         run: python -m compileall -q apps/api/app
+      - name: Run API tests
+        run: pytest -q apps/api/tests
   web:
     runs-on: ubuntu-latest
     defaults:
