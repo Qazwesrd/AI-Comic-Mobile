@@ -11,6 +11,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
       - key: APP_SECRET_KEY
         generateValue: true
       - key: TOKEN_PEPPER
