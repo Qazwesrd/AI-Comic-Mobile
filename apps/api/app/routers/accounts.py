@@ -12,9 +12,10 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import DeviceActivation, License, User, UserSession, utc_now
-from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, EmailCodeIn, LicenseOut, UserOut
+from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, EmailCodeIn, PhoneCodeIn, PhoneCredentialsIn, PhoneRegisterVerifyIn, LicenseOut, UserOut
 from ..security import create_session_token, decode_session_token, hash_csrf_token, hash_password, verify_password
 from ..security_services import create_one_time_code, consume_one_time_code, enforce_rate_limit, request_fingerprint, send_account_email
+from ..sms_service import send_phone_verification_code, check_phone_verification_code
 
 router = APIRouter(prefix="/api/v1", tags=["accounts"])
 
@@ -168,6 +169,93 @@ def verify_registration_code(
     db.commit()
     db.refresh(user)
     return _issue_session(user, db, response)
+
+@router.post("/auth/register/phone/send-code", status_code=status.HTTP_202_ACCEPTED)
+def send_phone_registration_code(
+    payload: PhoneCodeIn,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    phone = payload.phone
+    if db.scalar(select(User).where(User.phone == phone)) is not None:
+        raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录")
+    phone_key = hashlib.sha256(phone.encode("utf-8")).hexdigest()
+    enforce_rate_limit(
+        db, f"register-phone:{phone_key}", 5, 3600
+    )
+    enforce_rate_limit(
+        db, f"register-phone-ip:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    try:
+        send_phone_verification_code(phone)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    return {"message": "短信验证码已发送，5分钟内有效。"}
+
+
+@router.post("/auth/register/phone/verify", response_model=AuthOut, status_code=status.HTTP_201_CREATED)
+def verify_phone_registration_code(
+    payload: PhoneRegisterVerifyIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> AuthOut:
+    enforce_rate_limit(
+        db, f"register-phone-verify:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    if db.scalar(select(User).where(User.phone == payload.phone)) is not None:
+        raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录")
+    try:
+        verified = check_phone_verification_code(payload.phone, payload.code)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    if not verified:
+        raise HTTPException(status_code=400, detail="短信验证码错误或已过期")
+    bootstrap_admins = {
+        item.strip().lower()
+        for item in settings.admin_bootstrap_emails.split(",")
+        if item.strip()
+    }
+    user = User(
+        email=None,
+        phone=payload.phone,
+        password_hash=hash_password(payload.password),
+        phone_verified=True,
+    )
+    db.add(user)
+    try:
+        db.flush()
+        db.add(License(user_id=user.id))
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录") from None
+    return _issue_session(user, db, response)
+
+
+@router.post("/auth/login/phone", response_model=AuthOut)
+def login_with_phone(
+    payload: PhoneCredentialsIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> AuthOut:
+    enforce_rate_limit(
+        db, f"login-phone:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    user = db.scalar(select(User).where(User.phone == payload.phone))
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="手机号或密码错误")
+    if not user.phone_verified:
+        raise HTTPException(status_code=403, detail="手机号尚未验证")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="账号已停用")
+    return _issue_session(user, db, response)
+
 
 @router.post("/auth/login", response_model=AuthOut)
 def login(payload: CredentialsIn, request: Request, response: Response, db: Session = Depends(get_db)) -> AuthOut:
