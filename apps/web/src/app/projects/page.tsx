@@ -7,6 +7,7 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 type Project = { id: number; title: string; description: string; status: string };
 type NovelSummary = { id: number; title: string; analysis_status: string; chapter_count: number; analyzed_chapter_count: number };
+type CreativeArtifact = { id: number; type: "script" | "storyboard" | string; title: string; content: Record<string, unknown>; created_at: string | null };
 type Entity = {
   id: number;
   type: string;
@@ -46,6 +47,7 @@ export default function ProjectsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [artifact, setArtifact] = useState("");
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [artifacts, setArtifacts] = useState<CreativeArtifact[]>([]);
   const [imageStyle, setImageStyle] = useState("3d_anime");
   const [step, setStep] = useState<Step>(1);
   const [message, setMessage] = useState("");
@@ -97,6 +99,14 @@ export default function ProjectsPage() {
     } catch { setNovels([]); }
   }
 
+  async function loadArtifacts(projectId: number, targetNovelId: number) {
+    try {
+      const response = await fetch(`${API}/api/v1/projects/${projectId}/novels/${targetNovelId}/artifacts`, { credentials: "include" });
+      if (response.ok) setArtifacts(await response.json());
+      else setArtifacts([]);
+    } catch { setArtifacts([]); }
+  }
+
   async function selectNovel(novel: NovelSummary) {
     setNovelId(novel.id);
     setNovelTitle(novel.title);
@@ -105,8 +115,10 @@ export default function ProjectsPage() {
     setProcessedChapters(novel.analyzed_chapter_count || 0);
     setHasMore(novel.analysis_status !== "analyzed");
     setEntities([]);
+    setArtifacts([]);
     setArtifact("");
     setStep(3);
+    if (selected) void loadArtifacts(selected, novel.id);
     try {
       const response = await fetch(`${API}/api/v1/projects/${selected}/novels/${novel.id}/entities`, { credentials: "include" });
       if (response.ok) setEntities(await response.json());
@@ -176,6 +188,7 @@ export default function ProjectsPage() {
       setHasMore(true);
       setText("");
       setEntities([]);
+      setArtifacts([]);
       setArtifact("");
       setStep(3);
       setMessage(`小说导入成功，已拆分为 ${data.chapter_count} 章。下一步进行 AI 解析。`);
@@ -283,6 +296,7 @@ export default function ProjectsPage() {
         if (entityResponse.ok) setEntities(await entityResponse.json());
         setMessage(`本批解析完成：${data.processed_chapters} 章，新增识别素材 ${data.entities_created} 项。`);
       } else {
+        await loadArtifacts(selected, novelId);
         setStep(4);
         setMessage(kind === "script" ? "漫剧剧本已生成，请检查内容。" : "分镜规划已生成，请检查镜头内容。");
       }
@@ -405,7 +419,7 @@ export default function ProjectsPage() {
                 <button type="button" className="account-submit" disabled={busy} onClick={() => void generate("script")}>{busy ? "正在生成…" : "生成漫剧剧本"}</button>
                 <button type="button" className="account-submit" disabled={busy} onClick={() => void generate("storyboard")}>{busy ? "正在生成…" : "生成分镜规划"}</button>
               </div>
-              {artifact && <details className="project-result" open><summary>查看最近一次 AI 生成结果</summary><pre className="artifact-output">{artifact}</pre></details>}
+              {artifacts.length > 0 && <div className="project-artifact-history"><div className="project-list-heading"><h3>已保存的生成成果</h3><span>{artifacts.length} 份</span></div>{artifacts.map(item => <details className="project-result" key={item.id}><summary>{item.type === "script" ? "漫剧剧本" : item.type === "storyboard" ? "分镜规划" : item.type} · {item.title}</summary><pre className="artifact-output">{JSON.stringify(item.content, null, 2)}</pre><small className="project-artifact-date">{item.created_at ? new Date(item.created_at).toLocaleString() : "已保存"}</small></details>)}</div>}{artifact && <details className="project-result"><summary>查看最近一次任务响应</summary><pre className="artifact-output">{artifact}</pre></details>}
               <button type="button" className="account-submit secondary" onClick={() => setStep(3)}>← 返回素材审核</button>
             </section>
           )}
