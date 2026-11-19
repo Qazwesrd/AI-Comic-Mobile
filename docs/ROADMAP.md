@@ -48,7 +48,7 @@
 - [x] 软件内置文本/图片/语音 API 配置状态查询（部署环境变量）
 - [x] Android 客户端目录：ChatGPT、DeepSeek、Claude、豆包、即梦 AI、CapCut（包名已核实）
 - [x] Capacitor App Launcher 检测和启动 Android 已安装客户端
-- [x] Android 11+ 仅声明五个已核实客户端的 package visibility
+- [x] Android 11+ 仅声明六个已核实客户端的 package visibility
 - [x] 漫剧与独立 AI 视频剪辑共用双模式入口、提示词复制和素材导入流程
 - [ ] 剪映/CapCut、可灵、Runway 等客户端逐一核实包名与官方启动能力后再接入
 - [ ] 账号级 AI 服务商自助配置、密钥加密保存和密钥不回显
