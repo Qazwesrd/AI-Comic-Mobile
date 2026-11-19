@@ -116,7 +116,6 @@ def init_upload(
         "reference": ("image/", "application/pdf"), "video": "video/",
         "audio": "audio/", "subtitle": ("text/", "application/x-subrip"),
         "text": ("text/", "application/json"),
-        "text": ("text/", "application/json"),
     }[payload.asset_type]
     accepted = expected_prefix if isinstance(expected_prefix, tuple) else (expected_prefix,)
     if mime != "application/octet-stream" and not any(mime.startswith(prefix) if prefix.endswith("/") else mime == prefix for prefix in accepted):
