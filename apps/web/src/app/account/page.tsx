@@ -16,7 +16,7 @@ type License = {
 
 export default function AccountPage() {
   const [mode, setMode] = useState<"login" | "register">("register");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("");\n  const [phone, setPhone] = useState("");\n  const [registerMethod, setRegisterMethod] = useState<"email" | "phone">("email");\n  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
@@ -95,7 +95,7 @@ export default function AccountPage() {
 
       if (mode === "register" && !codeSent) {
         setCodeSent(true);
-        setMessage(data.message || "验证码已发送，请查收邮箱。");
+        setMessage(data.message || (method === "phone" ? "短信验证码已发送，请查收手机短信。" : "验证码已发送，请查收邮箱。"));
         setSuccess(true);
         return;
       }
@@ -106,7 +106,7 @@ export default function AccountPage() {
       await loadLicense(csrf);
       await loadDevices();
       setSuccess(true);
-      setMessage(mode === "register" ? "邮箱验证成功，账号创建完成。" : "登录成功，账号与试用状态已连接。");
+      setMessage(mode === "register" ? (method === "phone" ? "手机号验证成功，账号创建完成。" : "邮箱验证成功，账号创建完成。") : "登录成功，账号与试用状态已连接。");
       setPassword("");
       setVerificationCode("");
       setCodeSent(false);
@@ -191,13 +191,19 @@ export default function AccountPage() {
                 <button type="button" className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>创建账号</button>
                 <button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>登录账号</button>
               </div>
+              <div className="account-tabs account-method-tabs">
+                <button type="button" className={(mode === "register" ? registerMethod : loginMethod) === "email" ? "active" : ""} onClick={() => { if (mode === "register") setRegisterMethod("email"); else setLoginMethod("email"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>邮箱方式</button>
+                <button type="button" className={(mode === "register" ? registerMethod : loginMethod) === "phone" ? "active" : ""} onClick={() => { if (mode === "register") setRegisterMethod("phone"); else setLoginMethod("phone"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>手机号方式</button>
+              </div>
               <form className="account-form" onSubmit={submit}>
-                <label>邮箱地址<input type="email" autoComplete="email" required value={email} disabled={mode === "register" && codeSent} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                {(mode === "register" ? registerMethod : loginMethod) === "phone"
+                  ? <label>中国大陆手机号<input type="tel" inputMode="numeric" autoComplete="tel-national" pattern="1[3-9][0-9]{9}" maxLength={11} required value={phone} disabled={mode === "register" && codeSent} onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="请输入11位手机号" /></label>
+                  : <label>邮箱地址<input type="email" autoComplete="email" required value={email} disabled={mode === "register" && codeSent} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>}
                 <label>密码（至少10位）<input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={10} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入至少10位密码" /></label>
                 {mode === "register" && codeSent && (
-                  <label>邮箱验证码<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="请输入邮箱收到的6位数字验证码" /></label>
+                  <label>{registerMethod === "phone" ? "短信验证码" : "邮箱验证码"}<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={registerMethod === "phone" ? "请输入手机收到的6位数字验证码" : "请输入邮箱收到的6位数字验证码"} /></label>
                 )}
-                <button className="account-submit" disabled={busy}>{busy ? "正在处理…" : mode === "register" ? codeSent ? "验证并创建账号" : "获取邮箱验证码" : "登录并查看授权"}</button>
+                <button className="account-submit" disabled={busy}>{busy ? "正在处理…" : mode === "register" ? codeSent ? "验证并创建账号" : (registerMethod === "phone" ? "获取短信验证码" : "获取邮箱验证码") : "登录并查看授权"}</button>
                 {mode === "register" && codeSent && (
                   <button type="button" className="account-submit" disabled={busy} onClick={() => void resendRegistrationCode()}>重新发送验证码</button>
                 )}
