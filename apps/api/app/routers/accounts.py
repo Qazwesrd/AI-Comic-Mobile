@@ -15,6 +15,7 @@ from ..models import DeviceActivation, License, User, UserSession, utc_now
 from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, EmailCodeIn, PhoneCodeIn, PhoneCredentialsIn, PhoneRegisterVerifyIn, LicenseOut, UserOut
 from ..security import create_session_token, decode_session_token, hash_csrf_token, hash_password, verify_password
 from ..security_services import create_one_time_code, consume_one_time_code, enforce_rate_limit, request_fingerprint, send_account_email
+from ..licensing import trial_expires_at
 from ..sms_service import send_phone_verification_code, check_phone_verification_code
 
 router = APIRouter(prefix="/api/v1", tags=["accounts"])
@@ -370,16 +371,10 @@ def license_status(user: User = Depends(get_current_user), db: Session = Depends
     return _license_status(license_record)
 
 
-def _as_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
-
-
 def _license_status(record: License) -> LicenseOut:
     now = datetime.now(timezone.utc)
-    started = _as_utc(record.trial_started_at)
-    expires = started + timedelta(hours=settings.trial_hours) if started else None
+    started = record.trial_started_at
+    expires = trial_expires_at(started)
 
     if record.permanent:
         state, remaining, message = "permanent", 0, "永久授权已生效"
