@@ -33,6 +33,8 @@ jobs:
         run: npm run build
       - name: Add Android project
         run: npx cap add android
+      - name: Configure native Android share receiver
+        run: python scripts/configure-android-share.py
       - name: Declare verified AI client packages for Android 11+
         run: |
           python - <<'PY'
