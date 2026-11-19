@@ -55,3 +55,9 @@ if settings.app_env == "production" and not settings.token_pepper:
 
 if settings.app_env == "production" and not settings.require_email_verification:
     raise RuntimeError("REQUIRE_EMAIL_VERIFICATION must be enabled in production.")
+
+if settings.app_env.lower() == "production":
+    if not settings.app_base_url.startswith("https://") or not settings.web_origin.startswith("https://"):
+        raise RuntimeError("APP_BASE_URL and WEB_ORIGIN must use HTTPS in production.")
+    if not settings.cors_origins:
+        raise RuntimeError("CORS_ORIGINS must be explicitly configured in production.")
