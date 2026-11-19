@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     session_cookie_name: str = "ai_comic_session"
     csrf_cookie_name: str = "ai_comic_csrf"
     session_cookie_samesite: str = "lax"
+    app_base_url: str = "http://localhost:3000"
+    token_pepper: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_use_tls: bool = True
+    payment_webhook_secret: str = ""
+    payment_checkout_url: str = ""
+    admin_bootstrap_emails: str = ""
+    rate_limit_auth_per_minute: int = 8
+    rate_limit_email_per_hour: int = 5
+    max_active_devices: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
