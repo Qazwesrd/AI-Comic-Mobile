@@ -431,7 +431,7 @@ def create_project(payload: ProjectIn, user: User = Depends(require_active_licen
 
 
 @router.get("/projects")
-def list_projects(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def list_projects(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(Project).where(Project.user_id == user.id).order_by(desc(Project.created_at))).all()
     return [{"id": p.id, "title": p.title, "description": p.description, "status": p.status} for p in rows]
 
@@ -633,7 +633,7 @@ def review_story_entity(
 
 
 @router.get("/projects/{project_id}/export")
-def export_project(project_id: int, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def export_project(project_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if project is None:
         raise HTTPException(status_code=404, detail="项目不存在")
@@ -679,7 +679,7 @@ def create_publish_job(payload: PublishIn, user: User = Depends(require_active_l
 
 
 @router.get("/publishing/jobs")
-def list_publish_jobs(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def list_publish_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(PublishJob).where(PublishJob.user_id == user.id).order_by(desc(PublishJob.created_at))).all()
     return [{"id": p.id, "platform": p.platform, "title": p.title, "status": p.status,
              "last_error": p.last_error, "created_at": _safe_dt(p.created_at)} for p in rows]
