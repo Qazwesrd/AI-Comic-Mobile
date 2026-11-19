@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
-    "start": "next start --hostname 0.0.0.0",
+    "start": "serve out -l 3000",
     "typecheck": "tsc --noEmit",
     "cap:add:android": "cap add android",
     "cap:sync": "cap sync",
@@ -24,6 +24,7 @@
     "typescript": "^5.9.3",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/android": "^7.4.3",
-    "@capacitor/ios": "^7.4.3"
+    "@capacitor/ios": "^7.4.3",
+    "serve": "^14.2.4"
   }
 }
