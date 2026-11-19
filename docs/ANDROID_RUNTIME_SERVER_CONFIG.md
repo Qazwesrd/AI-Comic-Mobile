@@ -9,7 +9,7 @@ Android APK 不再要求在构建时写入固定 API 域名。安装后可以在
 - 正式环境填写完整 HTTPS 根地址，例如 `https://api.your-domain.tld`。
 - 只填写域名根地址，不要附加 `/api`、用户名密码、查询参数或路径。
 - 非 HTTPS 仅允许 localhost 开发测试；正式 Android 连接应使用 HTTPS。
-- App 的健康检查请求为 `/api/health`；成功后显示连接成功。
+- App 的健康检查请求为 `/health`；成功后显示连接成功。
 - 不需要在构建 APK 前向开发者提供域名。
 
 ## 用户操作
