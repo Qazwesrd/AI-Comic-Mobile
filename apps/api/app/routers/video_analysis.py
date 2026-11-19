@@ -172,10 +172,17 @@ def export_video(
             segment_labels.append(f"[{gap_label}]")
             gap_index += 1
         inputs.extend(["-ss", f"{start_ms / 1000:.3f}", "-t", f"{(end_ms - start_ms) / 1000:.3f}", "-i", str(path)])
+        duration_seconds = (end_ms - start_ms) / 1000
+        fade_duration = min(0.35, duration_seconds / 2) if clip.get("transition") == "fade" else 0
+        fade_filters = (
+            f",fade=t=in:st=0:d={fade_duration:.3f},"
+            f"fade=t=out:st={max(0, duration_seconds - fade_duration):.3f}:d={fade_duration:.3f}"
+            if fade_duration else ""
+        )
         filters.append(
             f"[{index}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={payload.fps},"
-            f"format=yuv420p,setpts=PTS-STARTPTS[v{index}]"
+            f"format=yuv420p,setpts=PTS-STARTPTS{fade_filters}[v{index}]"
         )
         segment_labels.append(f"[v{index}]")
         cursor_ms = position_ms + end_ms - start_ms
@@ -199,6 +206,34 @@ def export_video(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_uuid = str(uuid4())
     output_path = output_dir / f"{output_uuid}.mp4"
+    subtitle_asset = None
+    subtitle_track = next((track for track in tracks if track.get("type") == "subtitle"), None)
+    subtitle_clips = (subtitle_track or {}).get("clips", [])
+    if subtitle_clips:
+        def srt_time(milliseconds: int) -> str:
+            hours, remainder = divmod(milliseconds, 3_600_000)
+            minutes, remainder = divmod(remainder, 60_000)
+            seconds, millis = divmod(remainder, 1000)
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+        subtitle_lines = []
+        for number, item in enumerate(sorted(subtitle_clips, key=lambda x: int(x.get("start_ms", 0))), 1):
+            start_ms, end_ms = int(item.get("start_ms", 0)), int(item.get("end_ms", 0))
+            text = str(item.get("text") or "").strip()
+            if not text or start_ms < 0 or end_ms <= start_ms or end_ms > total_ms:
+                raise HTTPException(status_code=422, detail="字幕内容或时间范围无效，字幕必须位于成片时长内")
+            subtitle_lines.extend([str(number), f"{srt_time(start_ms)} --> {srt_time(end_ms)}", text, ""])
+        subtitle_path = output_dir / f"{output_uuid}.srt"
+        subtitle_path.write_text("\n".join(subtitle_lines), encoding="utf-8-sig")
+        subtitle_bytes = subtitle_path.read_bytes()
+        subtitle_asset = MediaAsset(
+            asset_uuid=str(uuid4()), user_id=user.id, project_id=None,
+            asset_type="subtitle", title=f"{project.title} - 字幕文件",
+            file_name=f"{project.title[:70]}-subtitles.srt", mime_type="application/x-subrip",
+            size_bytes=len(subtitle_bytes), sha256=hashlib.sha256(subtitle_bytes).hexdigest(),
+            storage_path=str(subtitle_path), approved=False,
+        )
+        db.add(subtitle_asset)
+        db.flush()
     command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", *inputs]
     if music_path:
         command.extend(["-stream_loop", "-1", "-i", str(music_path)])
@@ -244,5 +279,6 @@ def export_video(
         "asset_id": output.id, "file_name": output.file_name, "size_bytes": size,
         "resolution": payload.resolution, "fps": payload.fps, "duration_ms": total_ms,
         "status": "completed", "approved": False,
-        "note": "成片已保存到素材库；当前导出支持视频轨道剪辑与可选循环背景音乐，原始素材不会覆盖。",
+        "subtitle_asset_id": subtitle_asset.id if subtitle_asset else None,
+        "note": "成片已保存到素材库；支持视频轨道剪辑、可选循环背景音乐和独立 SRT 字幕文件，原始素材不会覆盖。字幕文件可导入剪辑软件继续调整。",
     }

@@ -115,6 +115,12 @@ def test_export_saved_video_timeline_to_mp4(tmp_path, monkeypatch):
                 "id": "video-main", "type": "video", "clips": [{
                     "id": "clip-1", "source_id": source_id, "start_ms": 0,
                     "end_ms": 5000, "position_ms": 0, "volume": 1,
+                    "transition": "fade"
+                }]
+            }, {
+                "id": "subtitle-main", "type": "subtitle", "clips": [{
+                    "id": "subtitle-1", "start_ms": 0, "end_ms": 2000,
+                    "position_ms": 0, "text": "测试字幕", "volume": 1,
                     "transition": "none"
                 }]
             }]})
@@ -125,3 +131,7 @@ def test_export_saved_video_timeline_to_mp4(tmp_path, monkeypatch):
         assert exported.json()["status"] == "completed"
         assert exported.json()["approved"] is False
         assert exported.json()["file_name"].endswith(".mp4")
+        assert exported.json()["subtitle_asset_id"] is not None
+        subtitle = client.get("/api/v1/assets/" + str(exported.json()["subtitle_asset_id"]) + "/download")
+        assert subtitle.status_code == 200
+        assert "测试字幕" in subtitle.content.decode("utf-8-sig")
