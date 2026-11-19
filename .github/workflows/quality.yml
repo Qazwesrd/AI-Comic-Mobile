@@ -19,7 +19,7 @@ jobs:
       - name: Compile API
         run: python -m compileall -q apps/api/app
       - name: Run API tests
-        run: pytest -q apps/api/tests
+        run: PYTHONPATH=apps/api pytest -q apps/api/tests
   web:
     runs-on: ubuntu-latest
     defaults:
