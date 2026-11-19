@@ -13,6 +13,7 @@ from ..database import get_db
 from ..models import DeviceActivation, License, User, UserSession, utc_now
 from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, LicenseOut, UserOut
 from ..security import create_session_token, decode_session_token, hash_csrf_token, hash_password, verify_password
+from ..security_services import create_one_time_token, enforce_rate_limit, request_fingerprint, send_account_email
 
 router = APIRouter(prefix="/api/v1", tags=["accounts"])
 
@@ -54,7 +55,8 @@ def _issue_session(user: User, db: Session, response: Response) -> AuthOut:
 
 
 @router.post("/auth/register", response_model=AuthOut, status_code=status.HTTP_201_CREATED)
-def register(payload: CredentialsIn, response: Response, db: Session = Depends(get_db)) -> AuthOut:
+def register(payload: CredentialsIn, request: Request, response: Response, db: Session = Depends(get_db)) -> AuthOut:
+    enforce_rate_limit(db, f"register:{request_fingerprint(request)}", settings.rate_limit_auth_per_minute, 60)
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=409, detail="该邮箱已注册")
@@ -68,16 +70,25 @@ def register(payload: CredentialsIn, response: Response, db: Session = Depends(g
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="该邮箱已注册")
+    if settings.require_email_verification:
+        raw_token = create_one_time_token(db, user, "verify_email", 30)
+        send_account_email(
+            user.email, "AI 漫剧手机版邮箱验证",
+            f"请在30分钟内打开以下链接完成邮箱验证：{settings.app_base_url}/verify-email?token={raw_token}",
+        )
     return _issue_session(user, db, response)
 
 
 @router.post("/auth/login", response_model=AuthOut)
-def login(payload: CredentialsIn, response: Response, db: Session = Depends(get_db)) -> AuthOut:
+def login(payload: CredentialsIn, request: Request, response: Response, db: Session = Depends(get_db)) -> AuthOut:
+    enforce_rate_limit(db, f"login:{request_fingerprint(request)}", settings.rate_limit_auth_per_minute, 60)
     user = db.scalar(select(User).where(User.email == payload.email))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已停用")
+    if settings.require_email_verification and not user.email_verified:
+        raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     return _issue_session(user, db, response)
 
 
