@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     rate_limit_auth_per_minute: int = 8
     rate_limit_email_per_hour: int = 5
     max_active_devices: int = 3
-    require_email_verification: bool = False
+    require_email_verification: bool = True
     ai_api_base_url: str = ""
     ai_api_key: str = ""
     ai_model: str = ""
