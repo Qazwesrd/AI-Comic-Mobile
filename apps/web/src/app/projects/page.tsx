@@ -57,17 +57,27 @@ export default function ProjectsPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  async function load(): Promise<Project[]> {
     try {
       const response = await fetch(`${API}/api/v1/projects`, { credentials: "include" });
-      if (response.ok) setProjects(await response.json());
+      if (response.ok) {
+        const rows = await response.json() as Project[];
+        setProjects(rows);
+        return rows;
+      }
     } catch {
       setMessage("暂时无法读取项目，请检查网络连接。");
     }
+    return [];
   }
 
   useEffect(() => {
-    void load();
+    void (async () => {
+      const rows = await load();
+      const targetId = Number(new URLSearchParams(window.location.search).get("project"));
+      const target = rows.find(project => project.id === targetId);
+      if (target) selectProject(target);
+    })();
   }, []);
 
   async function create(event: FormEvent) {
@@ -142,12 +152,16 @@ export default function ProjectsPage() {
     setSelected(project.id);
     setSelectedTitle(project.title);
     setNovelId(null);
+    setNovels([]);
     setChapterCount(0);
     setEntities([]);
+    setArtifacts([]);
+    setChapterAnalyses([]);
     setArtifact("");
     setProcessedChapters(0);
     setStep(2);
-    setMessage("已选择项目。可以导入小说，或导出该项目的数据。");
+    void loadNovels(project.id);
+    setMessage("已选择项目。可以继续之前的小说，或导入新小说。");
   }
 
   async function chooseNovelFile(event: ChangeEvent<HTMLInputElement>) {
