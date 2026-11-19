@@ -386,16 +386,16 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(get_cur
 
 @router.post("/projects/{project_id}/novels/{novel_id}/analyze")
 async def analyze_novel(
-    project_id: int, novel_id: int, limit: int = 10,
+    project_id: int, novel_id: int, limit: int = 10, offset: int = 0,
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    if limit < 1 or limit > 20:
+    if limit < 1 or limit > 20 or offset < 0:
         raise HTTPException(status_code=422, detail="每次最多解析20章")
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
     if project is None or novel is None:
         raise HTTPException(status_code=404, detail="项目或小说不存在")
-    chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no).limit(limit)).all()
+    chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no).offset(offset).limit(limit)).all()
     if not chapters:
         raise HTTPException(status_code=404, detail="没有可解析的章节")
     results = []
