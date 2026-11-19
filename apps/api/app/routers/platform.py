@@ -320,6 +320,10 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("/admin/products")
 def admin_create_product(payload: ProductIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if payload.amount_minor != 3000 or payload.currency.upper() != "CNY":
+        raise HTTPException(status_code=422, detail="永久授权售价固定为人民币 30.00 元")
+    if not payload.grants_permanent_license:
+        raise HTTPException(status_code=422, detail="本商品必须授予永久授权")
     if db.scalar(select(Product).where(Product.code == payload.code)):
         raise HTTPException(status_code=409, detail="商品编码已存在")
     values = payload.model_dump()
