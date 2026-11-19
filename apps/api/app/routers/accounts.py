@@ -180,9 +180,8 @@ def send_phone_registration_code(
     if db.scalar(select(User).where(User.phone == phone)) is not None:
         raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录")
     phone_key = hashlib.sha256(phone.encode("utf-8")).hexdigest()
-    enforce_rate_limit(
-        db, f"register-phone:{phone_key}", 5, 3600
-    )
+    enforce_rate_limit(db, f"register-phone:{phone_key}", 5, 3600)
+    enforce_rate_limit(db, f"register-phone-minute:{phone_key}", 1, 60)
     enforce_rate_limit(
         db, f"register-phone-ip:{request_fingerprint(request)}",
         settings.rate_limit_auth_per_minute, 60
@@ -201,10 +200,12 @@ def verify_phone_registration_code(
     response: Response,
     db: Session = Depends(get_db),
 ) -> AuthOut:
+    phone_key = hashlib.sha256(payload.phone.encode("utf-8")).hexdigest()
     enforce_rate_limit(
         db, f"register-phone-verify:{request_fingerprint(request)}",
         settings.rate_limit_auth_per_minute, 60
     )
+    enforce_rate_limit(db, f"register-phone-verify-number:{phone_key}", 10, 3600)
     if db.scalar(select(User).where(User.phone == payload.phone)) is not None:
         raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录")
     try:
