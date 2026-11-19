@@ -23,14 +23,14 @@
 - 设置足够长且随机的 APP_SECRET_KEY、独立 TOKEN_PEPPER。
 - APP_ENV=production、HTTPS、精确 CORS_ORIGINS、WEB_ORIGIN 和 APP_BASE_URL。
 - 执行 alembic upgrade head；生产服务启动不会自动创建或修改数据库结构。
-- 设置 SMTP_HOST、SMTP_PORT、SMTP_USERNAME、SMTP_PASSWORD、SMTP_FROM_EMAIL，并启用 REQUIRE_EMAIL_VERIFICATION。
+- 配置 Gmail API OAuth 2.0 邮件发送：GMAIL_CLIENT_ID、GMAIL_CLIENT_SECRET、GMAIL_REFRESH_TOKEN、GMAIL_SENDER_EMAIL，并启用 REQUIRE_EMAIL_VERIFICATION。后端通过 HTTPS 调用 Gmail API，不使用 Render Free 禁止的 SMTP 出站端口。
 - 设置 ADMIN_BOOTSTRAP_EMAILS，只填写可信管理员邮箱；该邮箱首次注册或登录时被提升为管理员。
 - AI_API_BASE_URL 应指向兼容 OpenAI Chat Completions 的服务地址（通常以 /v1 结尾），并设置 AI_API_KEY 与 AI_MODEL。密钥只放服务端环境变量。
 - 配置数据库备份、日志脱敏、告警和密钥轮换。
 
 ## 邮件安全
 
-验证邮箱令牌和重置密码令牌均只保存 HMAC 哈希，验证/重置成功后一次性失效。邮件功能只有在 SMTP 配置后才能真实发送。开发环境未配置 SMTP 时不会把原始令牌返回给浏览器。
+注册验证码为 6 位数字、有效期 10 分钟，只保存带 TOKEN_PEPPER 的 HMAC 摘要，验证成功后一次性失效；同一邮箱重新申请验证码会使旧验证码失效。验证码发送与验证均有限流。邮件通过 Gmail API HTTPS 发送，使用独立 OAuth 客户端和 gmail.send 最小权限；不要把 OAuth 客户端密钥或刷新令牌提交到 Git。
 
 ## 当前微信收款码与人工核账
 
