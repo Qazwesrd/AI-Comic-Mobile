@@ -19,9 +19,12 @@ type License = {
 export default function AccountPage() {
   async function openOfficialPayment() {
     const url = "https://ai-comic-mobile.pages.dev/store/";
-    if (Capacitor.isNativePlatform()) await AppLauncher.openUrl({ url });
-    else window.location.href = url;
+    if (isNativeApp) {
+      try { await AppLauncher.openUrl({ url }); }
+      catch { window.open(url, "_blank", "noopener,noreferrer"); }
+    } else window.location.href = url;
   }
+  const [isNativeApp, setIsNativeApp] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -59,6 +62,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setIsNativeApp(Capacitor.isNativePlatform());
     async function restoreSession() {
       try {
         const me = await fetch(`${API}/api/v1/auth/me`, { credentials: "include" });
@@ -195,7 +199,7 @@ export default function AccountPage() {
         <span className="system-pill"><i /> 账号中心</span>
       </header>
       <section className="account-wrap">
-        <a className="account-back" href={Capacitor.isNativePlatform() ? "/workspace/" : "/"}>← 返回{Capacitor.isNativePlatform() ? "软件工作台" : "官网首页"}</a>
+        <a className="account-back" href={isNativeApp ? "/workspace/" : "/"}>← 返回{Capacitor.isNativePlatform() ? "软件工作台" : "官网首页"}</a>
         <div className="account-card">
           <p className="eyebrow">IDENTITY & LICENSE</p>
           <h1>账号中心</h1>
