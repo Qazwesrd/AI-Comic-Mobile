@@ -195,7 +195,7 @@ export default function AccountPage() {
                 <label>邮箱地址<input type="email" autoComplete="email" required value={email} disabled={mode === "register" && codeSent} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                 <label>密码（至少10位）<input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={10} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入至少10位密码" /></label>
                 {mode === "register" && codeSent && (
-                  <label>邮箱验证码<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="请输入邮箱收到的6位数字验证码" /></label>
+                  <label>邮箱验证码<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="请输入邮箱收到的6位数字验证码" /></label>
                 )}
                 <button className="account-submit" disabled={busy}>{busy ? "正在处理…" : mode === "register" ? codeSent ? "验证并创建账号" : "获取邮箱验证码" : "登录并查看授权"}</button>
                 {mode === "register" && codeSent && (
