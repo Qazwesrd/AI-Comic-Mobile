@@ -43,7 +43,7 @@ export default function NativeAppChrome() {
     document.body.classList.add("native-app");
 
     let cancelled = false;
-    let countdown: ReturnType<typeof setInterval> | undefined;
+    let countdown: number | undefined;
     async function refreshLicense() {
       try {
         const response = await fetch(`${API}/api/v1/license/status`, { credentials: "include" });
