@@ -603,7 +603,7 @@ async def generate_storyboard(
 @router.get("/projects/{project_id}/novels/{novel_id}/artifacts")
 def list_artifacts(
     project_id: int, novel_id: int,
-    user: User = Depends(require_active_license), db: Session = Depends(get_db)
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
@@ -619,7 +619,7 @@ def list_artifacts(
 @router.get("/projects/{project_id}/novels/{novel_id}/entities")
 def list_story_entities(
     project_id: int, novel_id: int,
-    user: User = Depends(require_active_license), db: Session = Depends(get_db)
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
