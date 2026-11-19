@@ -3,7 +3,7 @@ import hmac
 import json
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -138,9 +138,11 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
         db = TestingSessionLocal()
         try:
             user = db.scalar(select(User).where(User.email == "trial-expired@example.com"))
-            license_record = db.scalar(select(License).where(License.user_id == user.id))
-            license_record.trial_started_at = utc_now() - timedelta(days=1)
+            expired_at = utc_now() - timedelta(days=4)
+            db.execute(update(License).where(License.user_id == user.id).values(trial_started_at=expired_at))
             db.commit()
+            refreshed = db.scalar(select(License).where(License.user_id == user.id))
+            assert refreshed.trial_started_at.replace(tzinfo=expired_at.tzinfo) < utc_now() - timedelta(hours=72)
         finally:
             db.close()
 
