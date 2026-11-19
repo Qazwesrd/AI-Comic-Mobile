@@ -44,12 +44,12 @@ export default function HomePage() {
                 <p>{module.detail}</p>
               </div>
               <span className="module-arrow">↗</span>
-            </article>
+            </a>
           ))}
         </div>
       </section>
 
-      <footer className="footer">
+      <nav className="portal-nav"><a href="/projects">创作项目</a><a href="/publishing">视频发布</a><a href="/store">购买授权</a><a href="/orders">订单查询</a><a href="/notices">维护公告</a><a href="/admin">管理后台</a></nav>\n\n      <footer className="footer">
         <span>AI COMIC MOBILE</span>
         <span>独立项目 · 赛博朋克创作体验</span>
       </footer>
