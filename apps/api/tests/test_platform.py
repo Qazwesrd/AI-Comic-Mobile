@@ -120,3 +120,32 @@ def test_payment_webhook_rejects_invalid_signature(monkeypatch):
         response = client.post("/api/v1/payments/webhook", content=b'{"event_id":"bad"}',
                                headers={"X-Payment-Signature": "invalid"})
         assert response.status_code == 401
+
+
+def test_expired_trial_blocks_writes_but_keeps_project_export():
+    from datetime import timedelta
+    from app.models import Project, utc_now
+
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "trial-expired@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        client.post("/api/v1/license/activate", headers=headers,
+                    json={"device_id": "trial-device-0101", "platform": "web"})
+        created = client.post("/api/v1/projects", headers=headers, json={"title": "保留数据项目"})
+        assert created.status_code == 200
+        project_id = created.json()["id"]
+
+        db = TestingSessionLocal()
+        try:
+            user = db.scalar(select(User).where(User.email == "trial-expired@example.com"))
+            license_record = db.scalar(select(License).where(License.user_id == user.id))
+            license_record.trial_started_at = utc_now() - timedelta(days=1)
+            db.commit()
+        finally:
+            db.close()
+
+        blocked = client.post("/api/v1/projects", headers=headers, json={"title": "到期后新项目"})
+        assert blocked.status_code == 402
+        exported = client.get(f"/api/v1/projects/{project_id}/export")
+        assert exported.status_code == 200
+        assert exported.json()["project"]["title"] == "保留数据项目"
