@@ -370,7 +370,7 @@ export default function ProjectsPage() {
           <div className="project-stepper" aria-label="创作步骤">
             {stepNames.map(item => (
               <button type="button" key={item.id} className={`project-step ${step === item.id ? "active" : ""} ${step > item.id ? "done" : ""}`} onClick={() => {
-                if (item.id === 1 || (item.id === 2 && selected) || (item.id === 3 && novelId) || (item.id === 4 && artifact)) setStep(item.id);
+                if (item.id === 1 || (item.id === 2 && selected) || (item.id === 3 && novelId) || (item.id === 4 && novelId && processedChapters > 0)) setStep(item.id);
               }}>
                 <span>{step > item.id ? "✓" : item.id}</span>
                 <strong>{item.title}</strong>
