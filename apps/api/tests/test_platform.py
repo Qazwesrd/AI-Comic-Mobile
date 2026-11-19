@@ -64,6 +64,39 @@ def test_project_novel_import_and_owner_isolation():
 
 
 
+def test_permanent_license_keeps_same_core_creation_and_import_access_as_trial():
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "permanent-feature-parity@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activated = client.post("/api/v1/license/activate", headers=headers, json={
+            "device_id": "feature-parity-device", "platform": "android"
+        })
+        assert activated.status_code == 200
+        assert activated.json()["status"] == "trial"
+
+        db = TestingSessionLocal()
+        try:
+            user = db.scalar(select(User).where(User.email == "permanent-feature-parity@example.com"))
+            license_record = db.scalar(select(License).where(License.user_id == user.id))
+            license_record.permanent = True
+            db.commit()
+        finally:
+            db.close()
+
+        status_response = client.get("/api/v1/license/status")
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "permanent"
+
+        created = client.post("/api/v1/projects", headers=headers, json={"title": "正式授权功能测试"})
+        assert created.status_code == 200
+        imported = client.post(
+            f"/api/v1/projects/{created.json()['id']}/novels",
+            headers=headers,
+            json={"title": "正式授权小说", "text": "第一章\n正文"},
+        )
+        assert imported.status_code == 200
+
+
 def test_release_download_requires_permanent_license_and_hides_direct_url():
     with TestClient(app, base_url="http://localhost:3000") as client:
         csrf = register(client, "release-trial@example.com")
