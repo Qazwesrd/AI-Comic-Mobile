@@ -93,13 +93,13 @@ def create_render(
 
 
 @router.get("/renders")
-def list_renders(user=Depends(require_active_license), db: Session = Depends(get_db)):
+def list_renders(user=Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(RenderJob).where(RenderJob.user_id == user.id).order_by(desc(RenderJob.created_at)).limit(100)).all()
     return [_render_out(job) for job in rows]
 
 
 @router.get("/renders/{job_id}")
-def get_render(job_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
+def get_render(job_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
     job = db.scalar(select(RenderJob).where(RenderJob.id == job_id, RenderJob.user_id == user.id))
     if job is None:
         raise HTTPException(status_code=404, detail="渲染任务不存在")
