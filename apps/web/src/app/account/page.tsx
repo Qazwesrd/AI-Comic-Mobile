@@ -85,6 +85,20 @@ export default function AccountPage() {
     }
   }
 
+  async function sendVerification() {
+    try {
+      const response = await fetch(`${API}/api/v1/auth/email/verify/request`, {
+        method: "POST", credentials: "include", headers: { "X-CSRF-Token": csrfToken }
+      });
+      const data = await response.json();
+      setMessage(response.ok ? data.message : data.detail || "发送失败");
+      setSuccess(response.ok);
+    } catch {
+      setMessage("暂时无法发送验证邮件");
+      setSuccess(false);
+    }
+  }
+
   async function logout() {
     try {
       const response = await fetch(`${API}/api/v1/auth/logout`, {
@@ -130,20 +144,20 @@ export default function AccountPage() {
                 <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                 <label>密码（至少10位）<input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={10} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入至少10位密码" /></label>
                 <button className="account-submit" disabled={busy}>{busy ? "正在连接…" : mode === "register" ? "注册并开始试用" : "登录并查看授权"}</button>
-              </form>
+              </form>\n              <a className="account-back" href="/forgot-password">忘记密码？点击找回</a>
             </>
           )}
           <p className={`account-message ${success ? "ok" : ""}`}>{message}</p>
           {license && (
             <div className="account-status">
-              <strong>{license.message}</strong><br />
+              <strong>{license.message}</strong><br />\n              <button type="button" className="account-submit" onClick={() => void sendVerification()}>发送邮箱验证邮件</button><br />
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
               {license.status === "expired" && "请前往官网购买永久授权。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
               <br /><button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
             </div>
           )}
-          <p className="account-message">登录凭据由 HttpOnly Cookie 保存；页面不会读取或保存访问令牌。</p>
+          <p className="account-message">登录凭据由 HttpOnly Cookie 保存；页面不会读取或保存访问令牌。</p>\n          <a className="account-back" href="/store">购买永久授权</a>　<a className="account-back" href="/orders">订单查询</a>
         </div>
       </section>
     </main>
