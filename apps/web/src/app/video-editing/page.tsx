@@ -161,7 +161,7 @@ export default function VideoEditingPage() {
             <label>告诉AI你想怎样剪辑<textarea rows={4} value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="例如：保留节奏紧凑的部分，删除停顿，按时间顺序组合，输出竖屏短视频。"/></label>
             <button className="account-submit" disabled={busy||sources.length===0||instruction.trim().length<3} onClick={()=>void createPlan()}>{busy?"处理中…":"生成AI剪辑建议"}</button>
           </div>
-          <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} />
+          <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} keyframes={sources.flatMap(source=>(keyframes[source.id]||[]).map(frame=>({...frame,source_id:source.id})))} />
           {plan&&<article className="portal-card"><strong>AI建议（草稿）</strong><p>{plan.summary}</p>{plan.limitations.map((x,i)=><p key={i}>注意：{x}</p>)}<p>建议片段：{plan.clips.length}</p><button className="account-submit" disabled={!plan.clips.length} onClick={applyPlan}>应用到时间线</button></article>}
           <h3>时间线 · 版本 {revision}</h3>
           <p>可提取关键帧交给支持图片理解的 AI 客户端；视频轨道可编辑并导出 MP4，支持可选背景音乐接口。</p>
