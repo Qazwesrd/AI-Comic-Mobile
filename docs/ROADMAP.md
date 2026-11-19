@@ -43,7 +43,7 @@
 
 ## 阶段 3A：Android 双模式 AI 工具接入（客户端启动第一批已提交）
 - [x] 软件内置文本/图片/语音 API 配置状态查询（部署环境变量）
-- [x] Android 客户端目录：ChatGPT、DeepSeek、Claude、豆包、即梦 AI（包名已核实）
+- [x] Android 客户端目录：ChatGPT、DeepSeek、Claude、豆包、即梦 AI、CapCut（包名已核实）
 - [x] Capacitor App Launcher 检测和启动 Android 已安装客户端
 - [x] Android 11+ 仅声明五个已核实客户端的 package visibility
 - [x] 漫剧与独立 AI 视频剪辑共用双模式入口、提示词复制和素材导入流程
