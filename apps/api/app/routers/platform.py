@@ -482,6 +482,26 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require
             "message": "小说已导入并拆分章节；AI 深度解析需要配置模型服务后执行"}
 
 
+@router.get("/projects/{project_id}/novels/{novel_id}/chapters")
+def list_novel_chapters(
+    project_id: int, novel_id: int,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    if project is None or novel is None:
+        raise HTTPException(status_code=404, detail="项目或小说不存在")
+    chapters = db.scalars(
+        select(Chapter).where(Chapter.novel_id == novel_id).order_by(Chapter.chapter_no)
+    ).all()
+    return [{
+        "chapter_no": chapter.chapter_no,
+        "title": chapter.title,
+        "analyzed": bool(chapter.analysis_json),
+        "analysis": json.loads(chapter.analysis_json) if chapter.analysis_json else None,
+    } for chapter in chapters]
+
+
 @router.post("/projects/{project_id}/novels/{novel_id}/analyze")
 async def analyze_novel(
     project_id: int, novel_id: int, request: Request, limit: int = 10, offset: int = 0,
