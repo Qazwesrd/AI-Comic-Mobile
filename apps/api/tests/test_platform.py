@@ -244,6 +244,8 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
 
         blocked = client.post("/api/v1/projects", headers=headers, json={"title": "到期后新项目"})
         assert blocked.status_code == 402
+        blocked_ai_test = client.post("/api/v1/ai-provider-configs/text/test", headers=headers)
+        assert blocked_ai_test.status_code == 402
         exported = client.get(f"/api/v1/projects/{project_id}/export")
         assert exported.status_code == 200
         assert exported.json()["project"]["title"] == "保留数据项目"
