@@ -6,7 +6,7 @@ import { csrfHeaders } from "../../lib/api";
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 type Project = { id: number; title: string; description: string; status: string };
-type NovelSummary = { id: number; title: string; analysis_status: string; chapter_count: number };
+type NovelSummary = { id: number; title: string; analysis_status: string; chapter_count: number; analyzed_chapter_count: number };
 type Entity = {
   id: number;
   type: string;
@@ -337,7 +337,7 @@ export default function ProjectsPage() {
             <section className="project-stage">
               <div className="project-stage-heading"><span>STEP 02</span><h2>导入小说</h2></div>
               <div className="project-current"><small>当前项目</small><strong>{selectedTitle}</strong><button type="button" onClick={() => setStep(1)}>切换项目</button></div>
-              {novels.length > 0 && <div className="project-existing-novels"><div className="project-list-heading"><h3>继续之前的小说</h3><span>{novels.length} 部</span></div>{novels.map(novel => <button type="button" className="portal-card project-select" key={novel.id} onClick={() => void selectNovel(novel)}><strong>{novel.title}</strong><p>{novel.chapter_count} 章 · {novel.analysis_status === "analyzed" ? "解析完成" : novel.analysis_status === "partially_analyzed" ? "部分解析" : "等待解析"}</p><small>点击继续处理</small></button>)}</div>}\n              <form className="account-form" onSubmit={importNovel}>
+              {novels.length > 0 && <div className="project-existing-novels"><div className="project-list-heading"><h3>继续之前的小说</h3><span>{novels.length} 部</span></div>{novels.map(novel => <button type="button" className="portal-card project-select" key={novel.id} onClick={() => void selectNovel(novel)}><strong>{novel.title}</strong><p>{novel.chapter_count} 章 · 已解析 {novel.analyzed_chapter_count || 0} 章 · {novel.analysis_status === "analyzed" ? "解析完成" : novel.analysis_status === "partially_analyzed" ? "部分解析" : "等待解析"}</p><small>点击继续处理</small></button>)}</div>}\n              <form className="account-form" onSubmit={importNovel}>
                 <label>小说名称<input required maxLength={200} value={novelTitle} onChange={event => setNovelTitle(event.target.value)} /></label>
                 <label className="project-file-picker">选择 TXT 小说文件<input type="file" accept=".txt,text/plain" onChange={event => void chooseNovelFile(event)} /><small>支持 .txt，单文件最大 5 MB。也可以直接粘贴正文。</small></label>
                 <label>小说正文<textarea required rows={9} maxLength={5000000} value={text} onChange={event => setText(event.target.value)} placeholder="将小说正文粘贴到这里，系统会自动识别常见章节标题…" /></label>
