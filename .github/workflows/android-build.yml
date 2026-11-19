@@ -2,6 +2,11 @@ name: Android Debug APK
 
 on:
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "真实部署的 HTTPS API 根地址（例如 https://api.your-domain.com）"
+        required: true
+        type: string
   pull_request:
     branches: [main]
     paths:
@@ -10,12 +15,13 @@ on:
 
 jobs:
   android:
+    if: github.event_name != 'pull_request' || vars.NEXT_PUBLIC_API_BASE_URL != ''
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/web
     env:
-      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ inputs.api_base_url || vars.NEXT_PUBLIC_API_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,8 +43,8 @@ jobs:
           value = os.environ.get("NEXT_PUBLIC_API_BASE_URL", "").strip()
           if not value:
               raise SystemExit(
-                  "Missing GitHub Actions repository variable NEXT_PUBLIC_API_BASE_URL. "
-                  "Set it to the real HTTPS API origin before building an installable APK."
+                  "Missing API URL. Set the GitHub repository variable NEXT_PUBLIC_API_BASE_URL "
+                  "or provide api_base_url when manually starting this workflow."
               )
 
           parsed = urlparse(value)
