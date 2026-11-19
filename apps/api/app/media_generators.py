@@ -28,7 +28,7 @@ def _provider(db: Session | None, user_id: int | None, capability: str):
     else:
         values = (settings.audio_api_base_url, settings.audio_api_key, settings.audio_model)
     if not all(values):
-        raise HTTPException(status_code=503, detail=f"请先在 AI 服务配置中心配置{capability} AI，或由服务部署方提供默认服务")
+        raise HTTPException(status_code=503, detail=(f"请先在 AI 服务配置中心配置{capability} AI，或由服务部署方配置 " + ("IMAGE_API_BASE_URL、IMAGE_API_KEY、IMAGE_MODEL" if capability == "image" else "AUDIO_API_BASE_URL、AUDIO_API_KEY、AUDIO_MODEL")))
     return "默认服务", values[0].rstrip("/"), values[1], values[2]
 
 
