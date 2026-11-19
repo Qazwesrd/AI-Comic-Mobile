@@ -79,8 +79,13 @@ def _send_registration_code(user: User, request: Request, db: Session) -> dict[s
     return {"message": "验证码已发送，请查收邮箱（也请检查垃圾邮件文件夹）。验证码10分钟内有效。"}
 
 
-@router.post("/auth/register", status_code=status.HTTP_202_ACCEPTED)
-def register(payload: CredentialsIn, request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
+@router.post("/auth/register", response_model=AuthOut, status_code=status.HTTP_201_CREATED)
+def register(
+    payload: CredentialsIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> AuthOut | dict[str, str]:
     enforce_rate_limit(
         db, f"register:{request_fingerprint(request)}",
         settings.rate_limit_auth_per_minute, 60
@@ -112,6 +117,17 @@ def register(payload: CredentialsIn, request: Request, db: Session = Depends(get
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="该邮箱已注册") from None
+    # Production configuration requires email verification. In development and CI,
+    # verification is opt-in so existing API tests and local workflows can create
+    # isolated accounts without contacting a real mail provider.
+    if not settings.require_email_verification:
+        user.email_verified = True
+        if db.scalar(select(License).where(License.user_id == user.id)) is None:
+            db.add(License(user_id=user.id))
+        db.commit()
+        db.refresh(user)
+        return _issue_session(user, db, response)
+
     return _send_registration_code(user, request, db)
 
 
