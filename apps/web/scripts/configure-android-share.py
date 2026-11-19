@@ -114,6 +114,7 @@ public class ShareReceiverPlugin extends Plugin {
                 files.put(item);
             }
             MainActivity.pendingShareIntent = null;
+            getActivity().setIntent(new android.content.Intent());
             JSObject result = new JSObject();
             result.put("files", files);
             call.resolve(result);
