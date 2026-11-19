@@ -47,3 +47,14 @@ Android 11+ 要求在 `AndroidManifest.xml` 的 `<queries>` 中声明需要检�
 - 纯文本文件保存为素材，不会自动执行或导入为小说正文。
 - Android 原生分享接收已实现并通过 Debug APK 自动构建；仍需在真机逐项验证 ACTION_SEND / ACTION_SEND_MULTIPLE、各客户端分享 URI、权限有效期及大文件导入。
 - 文件分类只是按扩展名/MIME 的初步判断，不是 AI 视觉识别；内容理解和自动关联建议后续接入。
+
+
+## 账号级 AI 服务配置（首版）
+
+- 已新增按账号隔离的文本、图片、语音服务配置 API 与手机配置页。
+- API Key 使用 Fernet 加密后存储；列表与保存响应只返回 `api_key_configured`，不返回密钥或密文。
+- 服务商、Base URL、模型名称和启用状态可由用户维护；更新时密钥留空表示保留旧密钥。
+- 连接测试请求 OpenAI 兼容的 `/models` 接口，并记录服务商、模型、状态和耗时；不记录密钥和请求正文。
+- 部署时必须设置独立且稳定的 `AI_CONFIG_ENCRYPTION_KEY`。可通过 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成；丢失或更换密钥会导致历史密钥无法解密。
+- 连接测试可能受服务商计费政策影响；软件不会自动购买、充值或调用付费服务。
+- 当前配置中心负责安全保存和连接测试；后续仍需将这些账号配置接入实际文本/图片/语音生成服务，并补充真实调用用量与费用统计。
