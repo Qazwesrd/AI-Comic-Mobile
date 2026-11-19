@@ -62,9 +62,6 @@ if settings.app_env.lower() == "production" and settings.session_cookie_samesite
     # SameSite=None is valid only with Secure cookies.
     pass
 
-if settings.app_env.lower() == "production" and settings.require_email_verification:
-    if not all([settings.gmail_client_id, settings.gmail_client_secret, settings.gmail_refresh_token, settings.gmail_sender_email]):
-        raise RuntimeError("GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN and GMAIL_SENDER_EMAIL are required when email verification is enforced.")
 if settings.app_env.lower() == "production" and not settings.token_pepper:
     raise RuntimeError("TOKEN_PEPPER must be configured in production.")
 
