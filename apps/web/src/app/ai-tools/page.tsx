@@ -9,7 +9,7 @@ type Tool = { id:string; name:string; category:string; package_name:string; stor
 type Data = { modes:{id:string;name:string;description:string;configured:boolean;configuration_note?:string;capabilities:Record<string,boolean>}[]; android_apps:Tool[]; workflow:string[]; limitations:string[] };
 
 const categoryNames:Record<string,string> = {
-  text:"文本创作与分析", "text-image":"文本与图片理解", "image-video":"图片与视频创作"
+  text:"文本创作与分析", "text-image":"文本与图片理解", "image-video":"图片与视频创作", "video-editing":"视频剪辑"
 };
 
 const taskPrompt = (tool:Tool) =>
@@ -94,7 +94,7 @@ export default function AIToolsPage() {
         </article>)}
         <h2>手机 AI 客户端</h2>
         <div className="account-form"><label>工具分类<select value={filter} onChange={e=>setFilter(e.target.value)}>
-          <option value="all">全部工具</option><option value="text">文本创作与分析</option><option value="text-image">文本与图片理解</option><option value="image-video">图片与视频创作</option>
+          <option value="all">全部工具</option><option value="text">文本创作与分析</option><option value="text-image">文本与图片理解</option><option value="image-video">图片与视频创作</option><option value="video-editing">视频剪辑</option>
         </select></label></div>
         <p className="account-message">{isAndroid?(checking?"正在检查手机已安装的 AI 客户端…":"已根据 Android 系统应用可见性规则检查客户端。"):"请在安卓版 APK 中使用客户端检测和启动功能。"}</p>
         <div className="module-grid">{tools.map(tool=><article className="module-card" key={tool.id}>
