@@ -90,8 +90,8 @@ export default function AIToolHandoff({ projectTitle, aspectRatio, instruction, 
         setMessage("已打开网页版 AI。请粘贴任务提示词并按需上传视频。");
         return;
       }
-      const result = await AppLauncher.canOpenUrl({ url: selected.package_name });
-      if (!result.value) {
+      const result = await AIAppLauncher.isInstalled({ packageName: selected.package_name });
+      if (!result.installed) {
         window.open(selected.store_url, "_blank", "noopener,noreferrer");
         setMessage(`未检测到 ${selected.name} 客户端，已打开官方安装页面。`);
         return;
