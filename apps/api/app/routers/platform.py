@@ -78,7 +78,7 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str = ""
     amount_minor: int = Field(gt=0, le=100000000)
-    currency: str = Field(default="EUR", min_length=3, max_length=3)
+    currency: str = Field(default="CNY", min_length=3, max_length=3)
     grants_permanent_license: bool = True
 
 
