@@ -30,13 +30,13 @@ from ..security_services import (
 router = APIRouter(prefix="/api/v1", tags=["platform"])
 
 
-def require_admin(user: User = Depends(get_current_user)) -> User:
+def require_admin(user: User = Depends(require_active_license)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
 
 
-def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+def require_active_license(user: User = Depends(require_active_license), db: Session = Depends(get_db)) -> User:
     if settings.require_email_verification and not (user.email_verified or user.phone_verified):
         raise HTTPException(status_code=403, detail="请先完成手机号或邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
@@ -133,7 +133,7 @@ class PublishIn(BaseModel):
 
 @router.post("/auth/email/verify/request")
 def request_email_verification(
-    request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    request: Request, user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"verify-email:{request_fingerprint(request)}", settings.rate_limit_email_per_hour, 3600)
     if user.email_verified:
@@ -200,7 +200,7 @@ def list_products(db: Session = Depends(get_db)):
 
 @router.post("/orders")
 def create_order(
-    payload: OrderCreateIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    payload: OrderCreateIn, request: Request, user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"create-order:{request_fingerprint(request)}", 10, 3600)
     if settings.require_email_verification and not (user.email_verified or user.phone_verified):
@@ -228,7 +228,7 @@ def create_order(
 
 
 @router.get("/orders")
-def my_orders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def my_orders(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     rows = db.scalars(select(Order).where(Order.user_id == user.id).order_by(desc(Order.created_at)).limit(100)).all()
     return [{"order_no": o.order_no, "status": o.status, "amount_minor": o.amount_minor,
              "currency": o.currency, "created_at": _safe_dt(o.created_at), "paid_at": _safe_dt(o.paid_at)} for o in rows]
@@ -322,14 +322,14 @@ def admin_confirm_manual_payment(
 
 
 @router.get("/devices")
-def list_devices(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_devices(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     devices = db.scalars(select(DeviceActivation).where(DeviceActivation.user_id == user.id)).all()
     return [{"device_id": d.device_id, "platform": d.platform,
              "first_seen_at": _safe_dt(d.first_seen_at), "last_seen_at": _safe_dt(d.last_seen_at)} for d in devices]
 
 
 @router.delete("/devices/{device_id}")
-def remove_device(device_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def remove_device(device_id: str, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     device = db.scalar(select(DeviceActivation).where(
         DeviceActivation.user_id == user.id, DeviceActivation.device_id == device_id
     ))
@@ -359,7 +359,7 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
 
 @router.get("/releases/{release_id}/download")
 def download_release(
-    release_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    release_id: int, user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     license_record = db.scalar(select(License).where(License.user_id == user.id))
     if license_record is None or not license_record.permanent:
@@ -431,7 +431,7 @@ def create_project(payload: ProjectIn, user: User = Depends(require_active_licen
 
 
 @router.get("/projects")
-def list_projects(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_projects(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     rows = db.scalars(select(Project).where(Project.user_id == user.id).order_by(desc(Project.created_at))).all()
     return [{"id": p.id, "title": p.title, "description": p.description, "status": p.status} for p in rows]
 
@@ -586,7 +586,7 @@ async def generate_storyboard(
 @router.get("/projects/{project_id}/novels/{novel_id}/artifacts")
 def list_artifacts(
     project_id: int, novel_id: int,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
@@ -602,7 +602,7 @@ def list_artifacts(
 @router.get("/projects/{project_id}/novels/{novel_id}/entities")
 def list_story_entities(
     project_id: int, novel_id: int,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
@@ -633,7 +633,7 @@ def review_story_entity(
 
 
 @router.get("/projects/{project_id}/export")
-def export_project(project_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def export_project(project_id: int, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if project is None:
         raise HTTPException(status_code=404, detail="项目不存在")
@@ -679,7 +679,7 @@ def create_publish_job(payload: PublishIn, user: User = Depends(require_active_l
 
 
 @router.get("/publishing/jobs")
-def list_publish_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_publish_jobs(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     rows = db.scalars(select(PublishJob).where(PublishJob.user_id == user.id).order_by(desc(PublishJob.created_at))).all()
     return [{"id": p.id, "platform": p.platform, "title": p.title, "status": p.status,
              "last_error": p.last_error, "created_at": _safe_dt(p.created_at)} for p in rows]
