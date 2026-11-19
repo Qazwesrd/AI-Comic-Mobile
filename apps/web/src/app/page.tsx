@@ -16,7 +16,7 @@ export default function HomePage() {
           <span className="brand-mark">AI</span>
           <span><strong>AI 漫剧</strong><small>MOBILE STUDIO</small></span>
         </a>
-        <span className="system-pill"><i /> 创作工作台</span>
+        <a className="system-pill" href="/account"><i /> 登录 / 注册</a>
       </header>
 
       <section className="hero">
