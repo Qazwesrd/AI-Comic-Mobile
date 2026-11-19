@@ -8,6 +8,7 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 type Project = { id: number; title: string; description: string; status: string };
 type NovelSummary = { id: number; title: string; analysis_status: string; chapter_count: number; analyzed_chapter_count: number };
 type CreativeArtifact = { id: number; type: "script" | "storyboard" | string; title: string; content: Record<string, unknown>; created_at: string | null };
+type ChapterAnalysis = { chapter_no: number; title: string; analyzed: boolean; analysis: Record<string, unknown> | null };
 type Entity = {
   id: number;
   type: string;
@@ -48,6 +49,7 @@ export default function ProjectsPage() {
   const [artifact, setArtifact] = useState("");
   const [entities, setEntities] = useState<Entity[]>([]);
   const [artifacts, setArtifacts] = useState<CreativeArtifact[]>([]);
+  const [chapterAnalyses, setChapterAnalyses] = useState<ChapterAnalysis[]>([]);
   const [visualPreview, setVisualPreview] = useState<{ assetId: number; url: string } | null>(null);
   const [imageStyle, setImageStyle] = useState("3d_anime");
   const [imagePrompt, setImagePrompt] = useState("");
@@ -101,6 +103,14 @@ export default function ProjectsPage() {
     } catch { setNovels([]); }
   }
 
+  async function loadChapterAnalyses(projectId: number, targetNovelId: number) {
+    try {
+      const response = await fetch(`${API}/api/v1/projects/${projectId}/novels/${targetNovelId}/chapters`, { credentials: "include" });
+      if (response.ok) setChapterAnalyses(await response.json());
+      else setChapterAnalyses([]);
+    } catch { setChapterAnalyses([]); }
+  }
+
   async function loadArtifacts(projectId: number, targetNovelId: number) {
     try {
       const response = await fetch(`${API}/api/v1/projects/${projectId}/novels/${targetNovelId}/artifacts`, { credentials: "include" });
@@ -120,7 +130,7 @@ export default function ProjectsPage() {
     setArtifacts([]);
     setArtifact("");
     setStep(3);
-    if (selected) void loadArtifacts(selected, novel.id);
+    if (selected) { void loadArtifacts(selected, novel.id); void loadChapterAnalyses(selected, novel.id); }
     try {
       const response = await fetch(`${API}/api/v1/projects/${selected}/novels/${novel.id}/entities`, { credentials: "include" });
       if (response.ok) setEntities(await response.json());
@@ -191,6 +201,7 @@ export default function ProjectsPage() {
       setText("");
       setEntities([]);
       setArtifacts([]);
+      setChapterAnalyses([]);
       setArtifact("");
       setStep(3);
       setMessage(`小说导入成功，已拆分为 ${data.chapter_count} 章。下一步进行 AI 解析。`);
@@ -310,6 +321,7 @@ export default function ProjectsPage() {
         setHasMore(data.has_more);
         const entityResponse = await fetch(`${API}/api/v1/projects/${selected}/novels/${novelId}/entities`, { credentials: "include" });
         if (entityResponse.ok) setEntities(await entityResponse.json());
+        await loadChapterAnalyses(selected, novelId);
         setMessage(`本批解析完成：${data.processed_chapters} 章，新增识别素材 ${data.entities_created} 项。`);
       } else {
         await loadArtifacts(selected, novelId);
@@ -400,6 +412,7 @@ export default function ProjectsPage() {
               <p className="project-tip">AI 解析需要先在 AI 配置中心启用文本模型。每批最多解析 10 章，避免一次处理过多内容。</p>
 
               <div className="project-list-heading"><h3>识别素材审核</h3><span>人物 {characterCount} · 场景 {sceneCount} · 道具 {propCount}</span></div>
+              {chapterAnalyses.some(chapter => chapter.analyzed) && <div className="project-chapter-analysis"><div className="project-list-heading"><h3>章节深度分析记录</h3><span>{chapterAnalyses.filter(chapter => chapter.analyzed).length}/{chapterAnalyses.length} 章已分析</span></div>{chapterAnalyses.filter(chapter => chapter.analyzed).map(chapter => <details className="project-result" key={chapter.chapter_no}><summary>第 {chapter.chapter_no} 章 · {chapter.title}</summary><div className="project-analysis-body"><strong>章节摘要</strong><p>{String(chapter.analysis?.summary || "暂无摘要")}</p>{(["events","relationships","timeline","continuity_notes"] as const).map(key => { const value = chapter.analysis?.[key]; return value ? <section key={key}><strong>{{events:"关键事件",relationships:"人物关系",timeline:"时间线",continuity_notes:"连续性提示"}[key]}</strong><pre className="artifact-output">{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre></section> : null; })}</div></details>)}</div>}
               {entities.length > 0 ? (
                 <>
                   <label className="project-style-select">参考图风格<select value={imageStyle} onChange={event => setImageStyle(event.target.value)}>
