@@ -50,6 +50,7 @@ export default function ProjectsPage() {
   const [artifacts, setArtifacts] = useState<CreativeArtifact[]>([]);
   const [visualPreview, setVisualPreview] = useState<{ assetId: number; url: string } | null>(null);
   const [imageStyle, setImageStyle] = useState("3d_anime");
+  const [imagePrompt, setImagePrompt] = useState("");
   const [step, setStep] = useState<Step>(1);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -242,7 +243,7 @@ export default function ProjectsPage() {
         method: "POST",
         credentials: "include",
         headers: await csrfHeaders(),
-        body: JSON.stringify({ style: imageStyle }),
+        body: JSON.stringify({ style: imageStyle, extra_prompt: imagePrompt.trim() }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "图片生成失败");
@@ -408,6 +409,7 @@ export default function ProjectsPage() {
                     <option value="guofeng">国风漫画风格</option>
                     <option value="ink">水墨动画风格</option>
                   </select></label>
+                  <label className="project-style-select">视觉设计补充要求（可选）<textarea rows={3} maxLength={1000} value={imagePrompt} onChange={event => setImagePrompt(event.target.value)} placeholder="例如：采用冷色电影光影、细腻材质、统一服装配色；描述希望保持的视觉风格特征。" /></label>
                   {entities.map(entity => (
                     <article className="project-entity" key={entity.id}>
                       <div className="project-entity-top"><span>{entityNames[entity.type] || entity.type}</span><strong>{entity.name}</strong><em className={entity.approved ? "approved" : ""}>{entity.approved ? "已确认" : "待审核"}</em></div>
