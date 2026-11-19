@@ -16,11 +16,15 @@ type Tool = {
   tasks: string[];
 };
 
-type AIAppLauncherPlugin = { isInstalled(options: { packageName: string }): Promise<{ installed: boolean }>; launch(options: { packageName: string }): Promise<void> };\nconst AIAppLauncher = registerPlugin<AIAppLauncherPlugin>("AIAppLauncher");\n\ntype Props = {
+type AIAppLauncherPlugin = { isInstalled(options: { packageName: string }): Promise<{ installed: boolean }>; launch(options: { packageName: string }): Promise<void> };
+const AIAppLauncher = registerPlugin<AIAppLauncherPlugin>("AIAppLauncher");
+
+type Props = {
   projectTitle: string;
   aspectRatio: string;
   instruction: string;
   sources: { id: number; file_name: string; duration_ms: number | null; probe_status: string }[];
+  keyframes?: { source_id: number; asset_id: number; timestamp_ms: number; file_name: string }[];
 };
 
 export default function AIToolHandoff({ projectTitle, aspectRatio, instruction, sources, keyframes = [] }: Props) {
@@ -46,23 +50,29 @@ export default function AIToolHandoff({ projectTitle, aspectRatio, instruction, 
 
   const selected = useMemo(() => tools.find(tool => tool.id === selectedId) || tools[0], [tools, selectedId]);
   const prompt = useMemo(() => {
-    const frameLines = keyframes.map(frame => `源素材 #${frame.source_id} 的关键帧：素材 #${frame.asset_id}，时间点 ${(frame.timestamp_ms / 1000).toFixed(1)} 秒（请用户从素材库下载并上传此图片）。`).join("\n");\n    const sourceLines = sources.map((source, index) =>
+    const frameLines = keyframes.map(frame => `源素材 #${frame.source_id} 的关键帧：素材 #${frame.asset_id}，时间点 ${(frame.timestamp_ms / 1000).toFixed(1)} 秒（请用户从素材库下载并上传此图片）。`).join("
+");
+    const sourceLines = sources.map((source, index) =>
       `${index + 1}. 素材编号 ${source.id}：${source.file_name}；时长：${source.duration_ms === null ? "尚未探测" : (source.duration_ms / 1000).toFixed(2) + "秒"}；媒体探测：${source.probe_status}`
-    ).join("\n");
+    ).join("
+");
     return [
       "你是专业短视频剪辑导演和时间线规划师，请根据以下资料帮助我完成视频剪辑。",
       `项目：${projectTitle}`,
       `目标画幅：${aspectRatio}`,
       `剪辑要求：${instruction || "请先根据素材给出剪辑思路，并向我询问具体风格。"}`,
       "素材清单：",
-      sourceLines || "尚未添加视频素材。",\n      "已提取关键帧：",\n      frameLines || "尚未提取关键帧；如需分析画面，请先提取并上传关键帧图片。",
+      sourceLines || "尚未添加视频素材。",
+      "已提取关键帧：",
+      frameLines || "尚未提取关键帧；如需分析画面，请先提取并上传关键帧图片。",
       "",
       "请遵守：不要编造没有提供的画面内容或时间码；如果无法直接读取视频，请明确告诉我需要上传哪些视频或关键帧。",
       "请优先输出可执行的剪辑清单，包含素材编号、入点、出点、时间线位置、镜头理由、字幕/音效建议。",
       "时间码必须在已知素材时长范围内；无法确定时标记为待人工确认。",
       "如果你能直接剪辑视频，请说明支持的输入格式、输出格式和限制；不要声称已经导出文件，除非实际提供了文件。",
       "请用简体中文回答，保持原视频核心内容，不要覆盖原始素材。"
-    ].join("\n");
+    ].join("
+");
   }, [projectTitle, aspectRatio, instruction, sources, keyframes]);
 
   async function copyPrompt() {
