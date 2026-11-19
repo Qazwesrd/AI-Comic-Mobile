@@ -24,7 +24,8 @@ export default function VideoEditingPage() {
   const [clips,setClips]=useState<Clip[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
-  const [revision,setRevision]=useState(0);\n  const [keyframes,setKeyframes]=useState<Record<number,{asset_id:number;timestamp_ms:number;file_name:string}[]>>({});
+  const [revision,setRevision]=useState(0);
+  const [keyframes,setKeyframes]=useState<Record<number,{asset_id:number;timestamp_ms:number;file_name:string}[]>>({});
 
   async function loadProjects() {
     const response=await fetch(API+"/api/v1/video-editing/projects",{credentials:"include"});
