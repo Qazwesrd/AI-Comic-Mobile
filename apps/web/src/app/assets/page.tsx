@@ -2,21 +2,22 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
-import { consumeAndroidSharedFiles } from "../../lib/android-share-receiver";
+import { AndroidSharedFile, consumeAndroidSharedFiles, readAndroidSharedChunk } from "../../lib/android-share-receiver";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const CHUNK_SIZE = 8 * 1024 * 1024;
 type AssetType = "video" | "image" | "character" | "scene" | "prop" | "reference" | "audio" | "subtitle" | "text";
 type Asset = { id:number; project_id:number|null; asset_type:AssetType; title:string; file_name:string; mime_type:string; size_bytes:number; approved:boolean };
 type Project = { id:number; title:string; status:string };
-type QueuedFile = { file:File; assetType:AssetType };
+type UploadableFile = File | AndroidSharedFile;
+type QueuedFile = { file:UploadableFile; assetType:AssetType };
 
 const typeLabels:Record<AssetType,string> = {
   video:"视频", image:"图片", character:"人物参考图", scene:"场景参考图",
   prop:"道具参考图", reference:"参考资料", audio:"音频", subtitle:"字幕", text:"文本资料"
 };
 
-function guessType(file:File):AssetType {
+function guessType(file:Pick<UploadableFile, "name" | "type">):AssetType {
   const name=file.name.toLowerCase();
   if (/\\.(srt|vtt)$/.test(name)) return "subtitle";
   if (/\\.(txt|md|markdown|json|csv)$/.test(name)) return "text";
@@ -86,7 +87,9 @@ export default function AssetsPage() {
     })});
     const data=await init.json();if(!init.ok)throw new Error(data.detail||`${file.name} 初始化上传失败`);
     for(let index=0;index<data.total_chunks;index++){
-      const part=file.slice(index*data.chunk_size,Math.min(file.size,(index+1)*data.chunk_size));
+      const start=index*data.chunk_size;
+      const end=Math.min(file.size,(index+1)*data.chunk_size);
+      const part="path" in file ? await readAndroidSharedChunk(file,start,end-start) : file.slice(start,end);
       const response=await fetch(`${API}/api/v1/uploads/${data.upload_id}/chunks/${index}`,{
         method:"PUT",credentials:"include",
         headers:{"X-CSRF-Token":headers["X-CSRF-Token"],"Content-Type":"application/octet-stream"},
