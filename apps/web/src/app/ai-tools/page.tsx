@@ -92,6 +92,7 @@ export default function AIToolsPage() {
           {mode.id==="built-in"&&<><p>文本模型：{mode.capabilities.text?"已配置":"未配置"} · 图片模型：{mode.capabilities.image?"已配置":"未配置"} · 配音模型：{mode.capabilities.audio?"已配置":"未配置"}</p><p>{mode.configuration_note}</p></>}
           {mode.id==="android-client"&&<p>安卓版可检测并启动已核实的客户端。第三方生成结果需要保存到手机后，再通过素材库导入。</p>}
         </article>)}
+        <h2>账号级 AI 服务配置</h2><p>为文本、图片和语音分别配置自己的 AI 服务商与 API Key。</p><a className="account-submit" href="/ai-config">打开 AI 服务配置中心 →</a>
         <h2>手机 AI 客户端</h2>
         <div className="account-form"><label>工具分类<select value={filter} onChange={e=>setFilter(e.target.value)}>
           <option value="all">全部工具</option><option value="text">文本创作与分析</option><option value="text-image">文本与图片理解</option><option value="image-video">图片与视频创作</option><option value="video-editing">视频剪辑</option>

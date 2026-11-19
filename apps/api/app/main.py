@@ -13,6 +13,8 @@ from .routers.renders import router as renders_router
 from .routers.ai_media import router as ai_media_router
 from .routers.video_editing import router as video_editing_router
 from .routers.ai_tools import router as ai_tools_router
+from .routers.ai_provider_configs import router as ai_provider_configs_router
+from . import ai_config_models  # noqa: F401
 
 
 @asynccontextmanager
@@ -54,6 +56,7 @@ app.include_router(renders_router)
 app.include_router(ai_media_router)
 app.include_router(video_editing_router)
 app.include_router(ai_tools_router)
+app.include_router(ai_provider_configs_router)
 
 
 @app.get("/health", tags=["system"])

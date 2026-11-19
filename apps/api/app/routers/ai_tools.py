@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..config import settings
+from ..database import get_db
+from ..ai_config_models import AIProviderConfig
 
 router = APIRouter(prefix="/api/v1/ai-tools", tags=["ai-tools"])
 
@@ -54,10 +58,14 @@ ANDROID_APPS = [
 
 
 @router.get("")
-def list_ai_tool_modes(user=Depends(get_current_user)):
-    text_ready = bool(settings.ai_api_base_url and settings.ai_api_key and settings.ai_model)
-    image_ready = bool(settings.image_api_base_url and settings.image_api_key and settings.image_model)
-    audio_ready = bool(settings.audio_api_base_url and settings.audio_api_key and settings.audio_model)
+def list_ai_tool_modes(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    configured = {
+        row.capability: row.enabled
+        for row in db.scalars(select(AIProviderConfig).where(AIProviderConfig.user_id == user.id)).all()
+    }
+    text_ready = configured.get("text", bool(settings.ai_api_base_url and settings.ai_api_key and settings.ai_model))
+    image_ready = configured.get("image", bool(settings.image_api_base_url and settings.image_api_key and settings.image_model))
+    audio_ready = configured.get("audio", bool(settings.audio_api_base_url and settings.audio_api_key and settings.audio_model))
     return {
         "modes": [
             {
@@ -65,7 +73,7 @@ def list_ai_tool_modes(user=Depends(get_current_user)):
                 "description": "软件后端调用已配置的模型服务，密钥不会返回到手机端。",
                 "configured": text_ready,
                 "capabilities": {"text": text_ready, "image": image_ready, "audio": audio_ready},
-                "configuration_note": "当前由部署环境配置 AI_API_BASE_URL / AI_API_KEY / AI_MODEL、IMAGE_API_* 和 AUDIO_API_*。账号级自助配置将在后续阶段实现。",
+                "configuration_note": "用户可在 AI 服务配置中心配置自己的文本、图片和语音服务；未配置个人服务时，兼容使用部署方提供的默认服务。",
             },
             {
                 "id": "android-client", "name": "手机已安装的 AI 客户端",

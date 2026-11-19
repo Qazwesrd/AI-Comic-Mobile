@@ -91,7 +91,7 @@ async def generate_story_entity_image(
         f"原文描述：{entity.description}。补充要求：{payload.extra_prompt}。"
         f"{view_instruction}高质量专业动画/影视前期美术设定。"
     )
-    content, mime, extension = await generate_image(prompt)
+    content, mime, extension = await generate_image(prompt, db=db, user_id=user.id)
     file_name = f"{entity.canonical_name}-reference{extension}"
     asset = _save_media(
         user.id, entity.entity_type, f"{entity.canonical_name}-AI视觉参考图",
@@ -126,7 +126,7 @@ async def create_subtitle_asset(
             raise HTTPException(status_code=404, detail="项目不存在")
     result = await chat_json(
         "你是专业字幕编辑。把输入文本切分为便于手机观看的中文字幕片段，按语义断句，单条尽量不超过20个汉字。只返回JSON，格式为 {segments:[{start_seconds:number,end_seconds:number,text:string}]}。时间从0开始，顺序递增，片段之间不要重叠，语速按自然中文口播估算。",
-        payload.text,
+        payload.text, db=db, user_id=user.id,
     )
     segments = result.get("segments")
     if not isinstance(segments, list) or not segments or len(segments) > 500:
@@ -170,7 +170,7 @@ async def create_speech_asset(
         project = db.scalar(select(Project).where(Project.id == payload.project_id, Project.user_id == user.id))
         if project is None:
             raise HTTPException(status_code=404, detail="项目不存在")
-    audio = await generate_speech(payload.text, payload.voice)
+    audio = await generate_speech(payload.text, payload.voice, db=db, user_id=user.id)
     file_name = f"voiceover-{uuid4().hex[:12]}.mp3"
     asset = _save_media(
         user.id, "audio", "AI配音-" + file_name, file_name,

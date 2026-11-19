@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = ""
     ai_timeout_seconds: int = 120
+    ai_config_encryption_key: str = ""
     media_root: str = "./storage/media"
     max_upload_bytes: int = 2147483648
     image_api_base_url: str = ""
@@ -71,3 +72,6 @@ if settings.app_env.lower() == "production":
         raise RuntimeError("APP_BASE_URL and WEB_ORIGIN must use HTTPS in production.")
     if not settings.cors_origins:
         raise RuntimeError("CORS_ORIGINS must be explicitly configured in production.")
+
+if settings.app_env.lower() == "production" and not settings.ai_config_encryption_key:
+    raise RuntimeError("AI_CONFIG_ENCRYPTION_KEY must be configured in production when account-level AI credentials are enabled.")

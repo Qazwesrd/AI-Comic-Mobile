@@ -430,6 +430,7 @@ async def analyze_novel(
         result = await chat_json(
             "你是专业漫剧编剧与故事分析师。只返回JSON，字段包括 summary、characters、scenes、props、events、relationships、timeline、continuity_notes。保留原作主线，不编造原文没有的重要事实。",
             f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}",
+            db=db, user_id=user.id,
         )
         chapter.analysis_json = json.dumps(result, ensure_ascii=False)
         for field_name, entity_type in (("characters", "character"), ("scenes", "scene"), ("props", "prop")):
@@ -491,7 +492,11 @@ async def _generate_artifact(
         system = "你是专业漫剧编剧。根据原文改编成可拍摄的漫剧剧本，保留主线、人物动机和关键事件。只返回JSON，包含 title、logline、scenes 数组，每场包含 location、time、characters、action、dialogue、emotion。"
     else:
         system = "你是专业分镜导演。将剧本/小说章节拆解为可执行分镜。只返回JSON，包含 aspect_ratio、shots 数组，每镜包含 shot_no、duration_seconds、shot_size、camera_move、visual_prompt、dialogue、sound、transition。"
-    result = await chat_json(system, f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}\n用户补充要求：{payload.instructions}")
+    result = await chat_json(
+        system,
+        f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}\n用户补充要求：{payload.instructions}",
+        db=db, user_id=user.id,
+    )
     item = CreativeArtifact(
         project_id=project.id, novel_id=novel.id, artifact_type=artifact_type,
         title=f"{chapter.title or '章节'+str(chapter.chapter_no)}-{artifact_type}",
