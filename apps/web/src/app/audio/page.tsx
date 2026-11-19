@@ -1,9 +1,11 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { FormEvent,useState } from "react";
 import { csrfHeaders } from "../../lib/api";
 
-const API=process.env.NEXT_PUBLIC_API_BASE_URL||"http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 export default function AudioPage(){
   const [text,setText]=useState("");const [voice,setVoice]=useState("alloy");
   const [message,setMessage]=useState("");const [assetId,setAssetId]=useState<number|null>(null);const [subtitleId,setSubtitleId]=useState<number|null>(null);
