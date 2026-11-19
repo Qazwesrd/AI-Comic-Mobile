@@ -25,10 +25,10 @@ export default function HomePage() {
       <section className="hero">
         <p className="eyebrow">NEXT-GEN STORY CREATION</p>
         <h1>让故事，<span>变成漫剧。</span></h1>
-        <p className="hero-copy">从小说解析到分镜生成，再到漫剧成片与平台发布。<br />把复杂创作流程，装进你的手机。</p>
+        <p className="hero-copy">从小说解析、人物场景资产，到分镜漫剧与 AI 视频剪辑。<br />两天免费试用，30 元一次购买，账号永久授权。</p>
         <div className="hero-actions">
           <a className="primary-action" href="#modules">进入创作工作台 <span>↗</span></a>
-          <span className="platform-note">ANDROID · ANDROID FIRST</span>
+          <span className="platform-note">ANDROID FIRST · 48H TRIAL · ¥30 LIFETIME</span>
         </div>
       </section>
 
@@ -52,6 +52,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="portal-card"><h2>简单透明的授权方式</h2><p>首次激活可免费体验 48 小时。试用结束后，支付人民币 30 元即可获得账号永久授权。第三方 AI 服务/API 费用由对应服务商收取，不包含在软件授权内。</p><a className="primary-action" href="/store">查看购买方式 ↗</a></section>
       <nav className="portal-nav"><a href="/projects">创作项目</a><a href="/assets">素材交接中心</a><a href="/render">分镜合成</a><a href="/ai-tools">AI工具中心</a><a href="/video-editing">AI视频剪辑</a><a href="/audio">AI配音</a><a href="/publishing">视频发布</a><a href="/store">购买授权</a><a href="/orders">订单查询</a><a href="/notices">维护公告</a><a href="/downloads">版本下载</a><a href="/admin">管理后台</a></nav>
       <footer className="footer">
         <span>AI COMIC MOBILE</span>
