@@ -70,7 +70,7 @@ class ShareReceiverPlugin : Plugin() {
                 if (uri.scheme != "content") continue
                 val name = queryName(uri)
                 val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                val target = File(cacheDir, "incoming-share").apply { mkdirs() }
+                val target = File(context.cacheDir, "incoming-share").apply { mkdirs() }
                 val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(120).ifBlank { "shared-file" }
                 val output = File.createTempFile("share-", "-$safeName", target)
                 var total = 0L
