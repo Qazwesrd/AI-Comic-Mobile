@@ -136,10 +136,14 @@ export default function AccountPage() {
     setMessage("");
     setSuccess(false);
     try {
-      const response = await fetch(`${API}/api/v1/auth/register/resend-code`, {
+      const endpoint = registerMethod === "phone"
+        ? "/api/v1/auth/register/phone/send-code"
+        : "/api/v1/auth/register/resend-code";
+      const body = registerMethod === "phone" ? { phone } : { email, password };
+      const response = await fetch(`${API}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
       const data = await response.json() as { detail?: string; message?: string };
       if (!response.ok) throw new Error(data.detail || "验证码发送失败");
