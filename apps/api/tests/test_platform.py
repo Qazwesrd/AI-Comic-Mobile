@@ -48,6 +48,9 @@ def test_project_novel_import_and_owner_isolation():
     with TestClient(app, base_url="http://localhost:3000") as client:
         csrf = register(client, "writer-one@example.com")
         headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activation = client.post("/api/v1/license/activate", headers=headers,
+                                 json={"device_id": "test-device-0101", "platform": "web"})
+        assert activation.status_code == 200
         created = client.post("/api/v1/projects", headers=headers, json={"title": "测试小说"})
         assert created.status_code == 200
         project_id = created.json()["id"]
