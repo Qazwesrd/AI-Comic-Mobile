@@ -39,7 +39,7 @@ def test_ai_provider_config_is_encrypted_and_never_returned(monkeypatch):
         })
         assert registered.status_code == 201
         csrf = registered.json()["csrf_token"]
-        headers = {"X-CSRF-Token": csrf}
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
         secret = "test-secret-key-123456789"
         response = client.put("/api/v1/ai-provider-configs", headers=headers, json={
             "capability": "text", "provider": "DeepSeek", "base_url": "https://api.example.com/v1",
