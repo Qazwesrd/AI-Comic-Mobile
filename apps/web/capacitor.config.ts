@@ -4,8 +4,7 @@ const config: CapacitorConfig = {
   appId: "com.qazwesrd.aicomicmobile",
   appName: "AI 漫剧手机版",
   webDir: "out",
-  android: { allowMixedContent: false },
-  ios: { contentInset: "automatic" }
+  android: { allowMixedContent: false }
 };
 
 export default config;
