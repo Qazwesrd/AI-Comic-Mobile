@@ -38,7 +38,10 @@ export default function AccountPage() {
   const [license, setLicense] = useState<License | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
-  const [busy, setBusy] = useState(false);\n  const [apiBase, setApiBase] = useState("");\n  const [apiStatus, setApiStatus] = useState("尚未检测");\n  const [apiBusy, setApiBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [apiBase, setApiBase] = useState("");
+  const [apiStatus, setApiStatus] = useState("尚未检测");
+  const [apiBusy, setApiBusy] = useState(false);
 
   function saveApiServer() {
     try {
@@ -92,7 +95,8 @@ export default function AccountPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsNativeApp(Capacitor.isNativePlatform());\n    setApiBase(getApiBaseUrl());
+    setIsNativeApp(Capacitor.isNativePlatform());
+    setApiBase(getApiBaseUrl());
     async function restoreSession() {
       try {
         const me = await fetch(apiUrl("/api/v1/auth/me"), { credentials: "include" });
@@ -233,7 +237,8 @@ export default function AccountPage() {
         <div className="account-card">
           <p className="eyebrow">IDENTITY & LICENSE</p>
           <h1>账号中心</h1>
-          <p>注册或登录账号，激活设备并查看免费试用状态。</p>\n          <section style={{ margin: "18px 0", padding: "16px", border: "1px solid rgba(140,144,255,.22)", borderRadius: "14px", background: "rgba(12,15,38,.55)" }}>
+          <p>注册或登录账号，激活设备并查看免费试用状态。</p>
+          <section style={{ margin: "18px 0", padding: "16px", border: "1px solid rgba(140,144,255,.22)", borderRadius: "14px", background: "rgba(12,15,38,.55)" }}>
             <h2 style={{ margin: "0 0 8px", fontSize: "17px" }}>服务器连接设置</h2>
             <p style={{ margin: "0 0 10px", fontSize: "12px", lineHeight: 1.7, color: "#aeb3d5" }}>配置 App 连接的 API 根地址。正式使用请填写已部署的 HTTPS 地址；只需填写域名，不要添加 /api 路径。</p>
             <label style={{ display: "block", fontSize: "12px" }}>API 根地址
