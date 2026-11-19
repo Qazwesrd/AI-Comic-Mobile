@@ -16,7 +16,7 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import (
-    Chapter, CreativeArtifact, DeviceActivation, License, Notice, OneTimeToken, Order, PaymentEvent,
+    Chapter, CreativeArtifact, DeviceActivation, License, MediaAsset, Notice, OneTimeToken, Order, PaymentEvent,
     Product, Project, PublishJob, Release, User, UserSession, Novel, StoryEntity, utc_now,
 )
 from ..security import hash_password
@@ -580,6 +580,7 @@ def export_project(project_id: int, user: User = Depends(get_current_user), db: 
         chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no)).all()
         entities = db.scalars(select(StoryEntity).where(StoryEntity.novel_id == novel.id)).all()
         artifacts = db.scalars(select(CreativeArtifact).where(CreativeArtifact.novel_id == novel.id)).all()
+        assets = db.scalars(select(MediaAsset).where(MediaAsset.project_id == project.id, MediaAsset.user_id == user.id)).all()
         result["novels"].append({
             "id": novel.id, "title": novel.title, "source_text": novel.source_text,
             "analysis_status": novel.analysis_status,
@@ -590,6 +591,9 @@ def export_project(project_id: int, user: User = Depends(get_current_user), db: 
                           "approved": e.approved} for e in entities],
             "artifacts": [{"type": a.artifact_type, "title": a.title,
                            "content": json.loads(a.content_json)} for a in artifacts],
+            "media_assets": [{"id": a.asset_uuid, "type": a.asset_type, "title": a.title,
+                              "file_name": a.file_name, "sha256": a.sha256, "size_bytes": a.size_bytes}
+                             for a in assets],
         })
     return result
 
