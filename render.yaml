@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: ai-comic-mobile-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    rootDir: apps/api
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_SECRET_KEY
+        generateValue: true
+      - key: TOKEN_PEPPER
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: TRIAL_HOURS
+        value: "48"
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: ADMIN_BOOTSTRAP_EMAILS
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: AI_CONFIG_ENCRYPTION_KEY
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET
+        sync: false
+      - key: MEDIA_ROOT
+        value: /tmp/ai-comic-media
