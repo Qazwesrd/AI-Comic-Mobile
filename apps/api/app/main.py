@@ -1,5 +1,21 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+
+def _cors_origins() -> list[str]:
+    """Return an explicit origin allowlist; production never inherits localhost origins."""
+    configured = os.getenv("CORS_ORIGINS", "")
+    origins = [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    if origins:
+        return origins
+
+    # Convenient defaults are restricted to local development only.
+    if os.getenv("APP_ENV", "development").lower() == "development":
+        return ["http://localhost:3000", "http://127.0.0.1:3000"]
+    return []
+
 
 app = FastAPI(
     title="AI Comic Mobile API",
@@ -9,10 +25,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
 
