@@ -11,16 +11,17 @@
 Android APK 和 Cloudflare Pages 都是静态前端构建，API 地址会在构建时写入前端资源。不能使用 `127.0.0.1`、`localhost` 或 `*.invalid` 作为手机安装包的后端地址。
 
 - GitHub：进入 Settings → Secrets and variables → Actions → Variables，新增仓库变量 `NEXT_PUBLIC_API_BASE_URL`，值填写真实部署的 HTTPS API 域名根地址。不要带 `/api/v1` 路径、查询参数或尾部斜杠。
+- 也可以手动运行 Android Debug APK 工作流，在 `api_base_url` 输入框填写真实 HTTPS API 根地址。
 - Cloudflare Pages：进入项目 `ai-comic-mobile` 的 Settings → Environment variables，为 Production 和 Preview 环境分别配置同名变量，然后重新部署。
 - API 服务必须已部署并可通过 `https://你的真实-api-域名/health` 访问。不要把 API 密钥放进 `NEXT_PUBLIC_*` 变量。
 
-Android 工作流会在编译前检查该变量；未配置、不是 HTTPS 或仍为本机/占位地址时会直接失败，不再生成无法连接服务器的 APK。
+Android 工作流会在编译前检查该变量；未配置、不是 HTTPS 或仍为本机/占位地址时会直接失败，不再生成无法连接服务器的 APK。PR 检查在未配置仓库变量时会跳过 APK 构建，不会把无效安装包当作成功产物。
 
 ## Android APK
 
 仓库提供 GitHub Actions 工作流：Android Debug APK。
 
-1. 先按上面的说明配置真实的 `NEXT_PUBLIC_API_BASE_URL`。
+1. 先按上面的说明配置真实的 `NEXT_PUBLIC_API_BASE_URL`，或手动运行工作流并输入 `api_base_url`。
 2. 合并代码到 `main`，或在 GitHub Actions 中打开 Android Debug APK 工作流运行。
 3. 构建成功后，在该次 workflow run 的 Artifacts 下载 `ai-comic-mobile-android-debug`。
 4. 这是 debug APK，仅用于内部安装验证；正式发布需要 Android release keystore、签名配置、版本号管理和真实设备验收。
