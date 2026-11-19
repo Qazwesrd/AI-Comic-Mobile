@@ -1,9 +1,9 @@
 const modules = [
-  { number: "01", title: "小说解析", detail: "拆解章节、人物、关系与剧情脉络", status: "核心创作" },
-  { number: "02", title: "角色与资产", detail: "统一管理人物、场景、道具视觉设定", status: "资产中心" },
-  { number: "03", title: "剧本与分镜", detail: "改编剧本，规划分集和镜头画面", status: "创作流程" },
-  { number: "04", title: "漫剧生成", detail: "组织画面、配音、字幕并导出成片", status: "成片制作" },
-  { number: "05", title: "视频发布", detail: "抖音 · 红果短剧 · 快手", status: "发布中心" }
+  { number: "01", title: "小说导入", detail: "创建项目、导入文本并自动拆分章节", status: "已接入", href: "/projects" },
+  { number: "02", title: "项目工作区", detail: "查看和管理你的小说漫剧项目", status: "创作流程", href: "/projects" },
+  { number: "03", title: "发布中心", detail: "准备抖音、红果短剧和快手发布资料", status: "官方授权优先", href: "/publishing" },
+  { number: "04", title: "永久授权", detail: "购买永久使用授权与查询订单", status: "账号服务", href: "/store" },
+  { number: "05", title: "服务公告", detail: "查看版本更新和维护通知", status: "服务信息", href: "/notices" }
 ];
 
 export default function HomePage() {
@@ -36,7 +36,7 @@ export default function HomePage() {
         </div>
         <div className="module-grid">
           {modules.map((module) => (
-            <article className="module-card" key={module.number}>
+            <a className="module-card" key={module.number} href={module.href}>
               <span className="module-number">{module.number}</span>
               <div className="module-content">
                 <span className="module-status">{module.status}</span>
