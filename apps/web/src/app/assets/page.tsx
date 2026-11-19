@@ -1,10 +1,12 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { ChangeEvent, useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
 import { AndroidSharedFile, consumeAndroidSharedFiles, readAndroidSharedChunk } from "../../lib/android-share-receiver";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 const CHUNK_SIZE = 8 * 1024 * 1024;
 type AssetType = "video" | "image" | "character" | "scene" | "prop" | "reference" | "audio" | "subtitle" | "text";
 type Asset = { id:number; project_id:number|null; asset_type:AssetType; title:string; file_name:string; mime_type:string; size_bytes:number; approved:boolean };
