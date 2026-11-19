@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 import { AppLauncher } from "@capacitor/app-launcher";
+import { apiUrl } from "../lib/api-base";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const OFFICIAL_SITE = "https://ai-comic-mobile.pages.dev/store/";
 type License = {
   status: "not_activated" | "trial" | "expired" | "permanent";
@@ -46,7 +46,7 @@ export default function NativeAppChrome() {
     let countdown: number | undefined;
     async function refreshLicense() {
       try {
-        const response = await fetch(`${API}/api/v1/license/status`, { credentials: "include" });
+        const response = await fetch(apiUrl("/api/v1/license/status"), { credentials: "include" });
         if (!response.ok) return;
         const data = await response.json() as License;
         if (cancelled) return;
