@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     app_secret_key: str = "development-only-change-me-please-use-32-bytes"
     database_url: str = "sqlite:///./ai_comic_mobile.db"
     access_token_minutes: int = 60 * 24
-    trial_hours: int = 72
+    trial_hours: int = 48
     web_origin: str = "http://localhost:3000"
     cors_origins: str = ""
     session_cookie_name: str = "ai_comic_session"
