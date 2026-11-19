@@ -43,6 +43,8 @@ jobs:
         run: npx cap add android
       - name: Configure native Android share receiver
         run: python scripts/configure-android-share.py
+      - name: Configure native Android AI client launcher
+        run: python scripts/configure-android-ai-launcher.py
       - name: Declare verified AI client packages for Android 11+
         run: |
           python - <<'PY'
