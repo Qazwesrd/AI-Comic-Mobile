@@ -35,8 +35,9 @@ export default function VideoEditingPage() {
     if(response.ok)setProjects(await response.json());
   }
   async function loadAssets() {
-    const response=await fetch(API+"/api/v1/assets?asset_type=video",{credentials:"include"});
-    if(response.ok)setAssets(await response.json());
+    const [videoResponse,audioResponse]=await Promise.all([fetch(API+"/api/v1/assets?asset_type=video",{credentials:"include"}),fetch(API+"/api/v1/assets?asset_type=audio",{credentials:"include"})]);
+    if(videoResponse.ok)setAssets(await videoResponse.json());
+    if(audioResponse.ok)setAudioAssets(await audioResponse.json());
   }
   async function openProject(project:Project) {
     setSelected(project);setPlan(null);setClips([]);
@@ -91,6 +92,7 @@ export default function VideoEditingPage() {
       const headers=await csrfHeaders();
       const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/export",{method:"POST",credentials:"include",headers,body:JSON.stringify({resolution:selected.aspect_ratio==="9:16"?"1080x1920":selected.aspect_ratio==="1:1"?"1080x1080":"1920x1080",fps:30,music_asset_id:musicAssetId?Number(musicAssetId):null})});
       const data=await response.json();if(!response.ok)throw new Error(data.detail||"视频导出失败");
+      setExportAssetId(data.asset_id);
       await loadAssets();
       setMessage("视频导出完成，成片已保存到素材库，素材编号："+data.asset_id+"。");
     }catch(e){setMessage(e instanceof Error?e.message:"视频导出失败");}
@@ -180,6 +182,7 @@ export default function VideoEditingPage() {
             </div>
           </article>)}
           <button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void saveTimeline()}>保存时间线版本</button><button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void exportVideo()}>{busy?"处理中…":"导出 MP4 成片"}</button>
+          {exportAssetId!==null&&<article className="portal-card"><strong>最近导出的成片</strong><p>素材编号：{exportAssetId}</p><video controls playsInline style={{width:"100%",maxHeight:360}} src={API+"/api/v1/assets/"+exportAssetId+"/download"} /><a href={API+"/api/v1/assets/"+exportAssetId+"/download"}>下载 MP4 成片</a></article>}
         </div>}
         <p className="account-message">{message}</p>
         <p style={{fontSize:11,color:"#8c90b2"}}>关键帧提取仅负责抽帧，不代表软件已自动理解画面；AI 视觉分析仍需通过支持图片理解的客户端或已配置视觉模型完成。MP4 导出由服务端 FFmpeg 执行，原始视频不会覆盖。</p>
