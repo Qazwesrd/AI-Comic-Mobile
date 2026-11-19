@@ -15,6 +15,9 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
+    from app.database import Base
+    from app import models  # noqa: F401
+    Base.metadata.create_all(bind=bind, checkfirst=True)
     if inspect(bind).has_table("story_entities"):
         columns = {column["name"] for column in inspect(bind).get_columns("story_entities")}
         if "visual_asset_id" not in columns:
