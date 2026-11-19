@@ -29,7 +29,13 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已失效，请重新登录")
 
     session = db.scalar(select(UserSession).where(UserSession.jti == jti))
-    if session is None or session.user_id != user_id or session.revoked_at is not None or session.expires_at <= utc_now():
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已失效，请重新登录")
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        from datetime import timezone
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if session.user_id != user_id or session.revoked_at is not None or expires_at <= utc_now():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已失效，请重新登录")
 
     if cookie_token:
