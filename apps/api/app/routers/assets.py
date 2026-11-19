@@ -235,7 +235,7 @@ def complete_upload(
 @router.get("/assets")
 def list_assets(
     project_id: int | None = None, asset_type: str | None = None,
-    user=Depends(get_current_user), db: Session = Depends(get_db),
+    user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     query = select(MediaAsset).where(MediaAsset.user_id == user.id)
     if project_id is not None:
@@ -252,7 +252,7 @@ def list_assets(
 @router.patch("/assets/{asset_id}")
 def update_asset(
     asset_id: int, payload: AssetUpdateIn,
-    user=Depends(get_current_user), db: Session = Depends(get_db),
+    user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     asset = db.scalar(select(MediaAsset).where(
         MediaAsset.id == asset_id, MediaAsset.user_id == user.id
@@ -285,7 +285,7 @@ def update_asset(
 
 
 @router.get("/assets/{asset_id}/download")
-def download_asset(asset_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def download_asset(asset_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
     asset = db.scalar(select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.user_id == user.id))
     if asset is None:
         raise HTTPException(status_code=404, detail="素材不存在")
@@ -296,7 +296,7 @@ def download_asset(asset_id: int, user=Depends(get_current_user), db: Session = 
 
 
 @router.delete("/assets/{asset_id}")
-def delete_asset(asset_id: int, user=Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_asset(asset_id: int, user=Depends(require_active_license), db: Session = Depends(get_db)):
     asset = db.scalar(select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.user_id == user.id))
     if asset is None:
         raise HTTPException(status_code=404, detail="素材不存在")
