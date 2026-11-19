@@ -153,7 +153,7 @@ def export_video(
         start_ms, end_ms = int(clip["start_ms"]), int(clip["end_ms"])
         if start_ms < 0 or end_ms <= start_ms or (source.duration_ms and end_ms > source.duration_ms):
             raise HTTPException(status_code=422, detail="时间线包含超出源视频范围的片段")
-        inputs.extend(["-ss", f"{start_ms / 1000:.3f}", "-to", f"{end_ms / 1000:.3f}", "-i", str(path)])
+        inputs.extend(["-ss", f"{start_ms / 1000:.3f}", "-t", f"{(end_ms - start_ms) / 1000:.3f}", "-i", str(path)])
         width, height = payload.resolution.split("x")
         filters.append(
             f"[{index}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
