@@ -124,7 +124,15 @@ def export_video(
         raise HTTPException(status_code=422, detail="视频轨道没有可导出的片段")
     if len(clips) > 100:
         raise HTTPException(status_code=422, detail="单次最多导出100个视频片段")
-    total_ms = sum(max(0, int(c["end_ms"]) - int(c["start_ms"])) for c in clips)
+    ordered = sorted(clips, key=lambda item: int(item.get("position_ms", 0)))
+    cursor_ms = 0
+    for clip in ordered:
+        position_ms = int(clip.get("position_ms", 0))
+        duration_ms = int(clip["end_ms"]) - int(clip["start_ms"])
+        if position_ms < cursor_ms:
+            raise HTTPException(status_code=422, detail="当前导出不支持视频片段重叠，请调整时间线位置")
+        cursor_ms = position_ms + duration_ms
+    total_ms = cursor_ms
     if total_ms <= 0 or total_ms > 600_000:
         raise HTTPException(status_code=422, detail="导出总时长必须在10分钟以内")
     ffmpeg = shutil.which("ffmpeg")
@@ -135,9 +143,12 @@ def export_video(
         VideoEditSource.project_id == project.id, VideoEditSource.user_id == user.id
     )).all()
     source_map = {row.id: row for row in source_rows}
-    ordered = sorted(clips, key=lambda item: int(item.get("position_ms", 0)))
     inputs: list[str] = []
     filters: list[str] = []
+    segment_labels: list[str] = []
+    cursor_ms = 0
+    gap_index = 0
+    width, height = payload.resolution.split("x")
     for index, clip in enumerate(ordered):
         source = source_map.get(int(clip.get("source_id") or 0))
         if source is None:
@@ -153,15 +164,23 @@ def export_video(
         start_ms, end_ms = int(clip["start_ms"]), int(clip["end_ms"])
         if start_ms < 0 or end_ms <= start_ms or (source.duration_ms and end_ms > source.duration_ms):
             raise HTTPException(status_code=422, detail="时间线包含超出源视频范围的片段")
+        position_ms = int(clip.get("position_ms", 0))
+        if position_ms > cursor_ms:
+            gap_label = f"gap{gap_index}"
+            gap_duration = (position_ms - cursor_ms) / 1000
+            filters.append(f"color=c=black:s={width}x{height}:r={payload.fps}:d={gap_duration:.3f},format=yuv420p,setpts=PTS-STARTPTS[{gap_label}]")
+            segment_labels.append(f"[{gap_label}]")
+            gap_index += 1
         inputs.extend(["-ss", f"{start_ms / 1000:.3f}", "-t", f"{(end_ms - start_ms) / 1000:.3f}", "-i", str(path)])
-        width, height = payload.resolution.split("x")
         filters.append(
             f"[{index}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={payload.fps},"
             f"format=yuv420p,setpts=PTS-STARTPTS[v{index}]"
         )
-    concat_inputs = "".join(f"[v{i}]" for i in range(len(ordered)))
-    filters.append(f"{concat_inputs}concat=n={len(ordered)}:v=1:a=0[outv]")
+        segment_labels.append(f"[v{index}]")
+        cursor_ms = position_ms + end_ms - start_ms
+    concat_inputs = "".join(segment_labels)
+    filters.append(f"{concat_inputs}concat=n={len(segment_labels)}:v=1:a=0[outv]")
 
     music_path = None
     if payload.music_asset_id is not None:
