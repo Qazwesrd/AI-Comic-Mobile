@@ -51,6 +51,7 @@ def test_ai_tools_endpoint_reports_android_clients_without_exposing_secrets(monk
         assert clients["claude"]["package_name"] == "com.anthropic.claude"
         assert clients["doubao"]["package_name"] == "com.larus.nova"
         assert clients["jimeng"]["package_name"] == "com.bytedance.dreamina"
+        assert clients["capcut"]["package_name"] == "com.lemon.lvoverseas"
         assert "web_tools" not in payload
         assert "do-not-return-this-secret" not in response.text
         assert all(item["store_url"].startswith("https://") for item in payload["android_apps"])
