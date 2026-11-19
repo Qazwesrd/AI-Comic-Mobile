@@ -560,6 +560,32 @@ def review_story_entity(
     return {"id": entity.id, "approved": entity.approved, "name": entity.canonical_name}
 
 
+@router.get("/projects/{project_id}/export")
+def export_project(project_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    novels = db.scalars(select(Novel).where(Novel.project_id == project.id).order_by(Novel.id)).all()
+    result = {"project": {"id": project.id, "title": project.title, "description": project.description},
+              "novels": []}
+    for novel in novels:
+        chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no)).all()
+        entities = db.scalars(select(StoryEntity).where(StoryEntity.novel_id == novel.id)).all()
+        artifacts = db.scalars(select(CreativeArtifact).where(CreativeArtifact.novel_id == novel.id)).all()
+        result["novels"].append({
+            "id": novel.id, "title": novel.title, "source_text": novel.source_text,
+            "analysis_status": novel.analysis_status,
+            "chapters": [{"chapter_no": ch.chapter_no, "title": ch.title, "content": ch.content,
+                          "analysis": json.loads(ch.analysis_json)} for ch in chapters],
+            "entities": [{"id": e.entity_uuid, "type": e.entity_type, "name": e.canonical_name,
+                          "description": e.description, "attributes": json.loads(e.attributes_json),
+                          "approved": e.approved} for e in entities],
+            "artifacts": [{"type": a.artifact_type, "title": a.title,
+                           "content": json.loads(a.content_json)} for a in artifacts],
+        })
+    return result
+
+
 @router.post("/publishing/jobs")
 def create_publish_job(payload: PublishIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     item = PublishJob(
