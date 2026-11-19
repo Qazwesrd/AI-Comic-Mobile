@@ -40,7 +40,7 @@ def require_active_license(user: User = Depends(get_current_user), db: Session =
         raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
     if record is None:
-        raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
+        raise HTTPException(status_code=402, detail="请先激活设备开始48小时试用")
     if record.permanent:
         return user
     if not record.trial_started_at:
@@ -78,7 +78,7 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str = ""
     amount_minor: int = Field(gt=0, le=100000000)
-    currency: str = Field(default="EUR", min_length=3, max_length=3)
+    currency: str = Field(default="CNY", min_length=3, max_length=3)
     grants_permanent_license: bool = True
 
 
@@ -320,6 +320,10 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("/admin/products")
 def admin_create_product(payload: ProductIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if payload.amount_minor != 3000 or payload.currency.upper() != "CNY":
+        raise HTTPException(status_code=422, detail="永久授权售价固定为人民币 30.00 元")
+    if not payload.grants_permanent_license:
+        raise HTTPException(status_code=422, detail="本商品必须授予永久授权")
     if db.scalar(select(Product).where(Product.code == payload.code)):
         raise HTTPException(status_code=409, detail="商品编码已存在")
     values = payload.model_dump()
