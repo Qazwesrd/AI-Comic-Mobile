@@ -1,112 +1,136 @@
 from pathlib import Path
 import re
 
-root = Path("android")
-manifest = root / "app/src/main/AndroidManifest.xml"
-main = root / "app/src/main/java/com/qazwesrd/aicomicmobile/MainActivity.kt"
-plugin = root / "app/src/main/java/com/qazwesrd/aicomicmobile/ShareReceiverPlugin.kt"
+manifest = Path("android/app/src/main/AndroidManifest.xml")
+java_dir = Path("android/app/src/main/java/com/qazwesrd/aicomicmobile")
+main = java_dir / "MainActivity.java"
+plugin = java_dir / "ShareReceiverPlugin.java"
 
-if not manifest.exists() or not main.parent.exists():
-    raise SystemExit("Capacitor Android project was not generated")
+if not manifest.exists() or not main.exists():
+    raise SystemExit("Capacitor Android project was not generated or MainActivity.java is missing")
 
-main.write_text("""package com.qazwesrd.aicomicmobile
+main.write_text("""package com.qazwesrd.aicomicmobile;
 
-import android.content.Intent
-import android.net.Uri
-import android.os.Bundle
-import com.getcapacitor.BridgeActivity
+import android.content.Intent;
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
 
-class MainActivity : BridgeActivity() {
-    companion object {
-        @Volatile var pendingShareIntent: Intent? = null
+public class MainActivity extends BridgeActivity {
+    public static volatile Intent pendingShareIntent;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ShareReceiverPlugin.class);
+        pendingShareIntent = getIntent();
+        super.onCreate(savedInstanceState);
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        registerPlugin(ShareReceiverPlugin::class.java)
-        pendingShareIntent = intent
-        super.onCreate(savedInstanceState)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        pendingShareIntent = intent
-        bridge?.triggerJSEvent("androidShareReceived", "{}")
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        pendingShareIntent = intent;
+        if (getBridge() != null) {
+            getBridge().triggerJSEvent("androidShareReceived", "{}");
+        }
     }
 }
 """, encoding="utf-8")
 
-plugin.write_text("""package com.qazwesrd.aicomicmobile
+plugin.write_text("""package com.qazwesrd.aicomicmobile;
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.OpenableColumns
-import com.getcapacitor.*
-import java.io.File
-import java.io.FileOutputStream
+import android.content.ClipData;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
+import com.getcapacitor.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @CapacitorPlugin(name = "ShareReceiver")
-class ShareReceiverPlugin : Plugin() {
+public class ShareReceiverPlugin extends Plugin {
     @PluginMethod
-    fun getPendingShares(call: PluginCall) {
-        val intent = MainActivity.pendingShareIntent ?: activity.intent
-        if (intent.action != Intent.ACTION_SEND && intent.action != Intent.ACTION_SEND_MULTIPLE) {
-            call.resolve(JSObject().put("files", JSArray()))
-            return
+    public void getPendingShares(PluginCall call) {
+        Intent intent = MainActivity.pendingShareIntent != null
+            ? MainActivity.pendingShareIntent : getActivity().getIntent();
+        if (intent == null || (!Intent.ACTION_SEND.equals(intent.getAction())
+            && !Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction()))) {
+            JSObject empty = new JSObject();
+            empty.put("files", new JSArray());
+            call.resolve(empty);
+            return;
         }
 
-        val uris = linkedSetOf<Uri>()
-        intent.clipData?.let { clip ->
-            for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(uris::add)
-        }
-        @Suppress("DEPRECATION")
-        (intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let(uris::add)
-        @Suppress("DEPRECATION")
-        (intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: arrayListOf()).forEach(uris::add)
-
-        val files = JSArray()
-        try {
-            for (uri in uris) {
-                if (uri.scheme != "content") continue
-                val name = queryName(uri)
-                val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                val target = File(context.cacheDir, "incoming-share").apply { mkdirs() }
-                val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(120).ifBlank { "shared-file" }
-                val output = File.createTempFile("share-", "-$safeName", target)
-                var total = 0L
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(output).use { out ->
-                        val buffer = ByteArray(1024 * 1024)
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            total += count
-                            if (total > 2L * 1024 * 1024 * 1024) throw IllegalArgumentException("Shared file exceeds 2 GiB")
-                            out.write(buffer, 0, count)
-                        }
-                    }
-                } ?: throw IllegalArgumentException("Cannot open shared content")
-                files.put(JSObject()
-                    .put("name", name)
-                    .put("mimeType", mime)
-                    .put("size", total)
-                    .put("path", output.absolutePath))
+        Set<Uri> uris = new LinkedHashSet<>();
+        ClipData clip = intent.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri uri = clip.getItemAt(i).getUri();
+                if (uri != null) uris.add(uri);
             }
-            MainActivity.pendingShareIntent = null
-            call.resolve(JSObject().put("files", files))
-        } catch (error: Exception) {
-            call.reject(error.message ?: "Unable to import shared files")
+        }
+        Uri single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        if (single != null) uris.add(single);
+        ArrayList<Uri> multiple = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+        if (multiple != null) uris.addAll(multiple);
+
+        JSArray files = new JSArray();
+        try {
+            File folder = new File(getContext().getCacheDir(), "incoming-share");
+            if (!folder.exists() && !folder.mkdirs()) throw new IllegalStateException("Cannot create share cache");
+            for (Uri uri : uris) {
+                if (!"content".equals(uri.getScheme())) continue;
+                String name = queryName(uri);
+                String mime = getContext().getContentResolver().getType(uri);
+                if (mime == null) mime = "application/octet-stream";
+                String safeName = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                if (safeName.length() > 120) safeName = safeName.substring(0, 120);
+                File output = File.createTempFile("share-", "-" + safeName, folder);
+                long total = 0;
+                try (InputStream input = getContext().getContentResolver().openInputStream(uri);
+                     FileOutputStream out = new FileOutputStream(output)) {
+                    if (input == null) throw new IllegalArgumentException("Cannot open shared content");
+                    byte[] buffer = new byte[1024 * 1024];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        total += count;
+                        if (total > 2L * 1024 * 1024 * 1024) {
+                            output.delete();
+                            throw new IllegalArgumentException("Shared file exceeds 2 GiB");
+                        }
+                        out.write(buffer, 0, count);
+                    }
+                }
+                JSObject item = new JSObject();
+                item.put("name", name);
+                item.put("mimeType", mime);
+                item.put("size", total);
+                item.put("path", output.getAbsolutePath());
+                files.put(item);
+            }
+            MainActivity.pendingShareIntent = null;
+            JSObject result = new JSObject();
+            result.put("files", files);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Unable to import shared files" : error.getMessage(), error);
         }
     }
 
-    private fun queryName(uri: Uri): String {
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0) return cursor.getString(index) ?: "shared-file"
+    private String queryName(Uri uri) {
+        try (Cursor cursor = getContext().getContentResolver().query(
+            uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0 && cursor.getString(index) != null) return cursor.getString(index);
             }
-        }
-        return "shared-file"
+        } catch (Exception ignored) { }
+        return "shared-file";
     }
 }
 """, encoding="utf-8")
@@ -139,4 +163,4 @@ if "android.intent.action.SEND" not in text:
     text = text[:match.start()] + match.group(1) + match.group(2) + filters + match.group(3) + text[match.end():]
     manifest.write_text(text, encoding="utf-8")
 
-print("Android share receiver source and SEND/SEND_MULTIPLE filters configured.")
+print("Android share receiver configured.")
