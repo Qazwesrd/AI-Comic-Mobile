@@ -244,10 +244,12 @@ def login_with_phone(
     response: Response,
     db: Session = Depends(get_db),
 ) -> AuthOut:
+    phone_key = hashlib.sha256(payload.phone.encode("utf-8")).hexdigest()
     enforce_rate_limit(
         db, f"login-phone:{request_fingerprint(request)}",
         settings.rate_limit_auth_per_minute, 60
     )
+    enforce_rate_limit(db, f"login-phone-number:{phone_key}", 10, 3600)
     user = db.scalar(select(User).where(User.phone == payload.phone))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="手机号或密码错误")
