@@ -7,6 +7,7 @@ from cryptography.fernet import Fernet
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+from app.ai_service import _text_provider
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -49,6 +50,17 @@ def test_ai_provider_config_is_encrypted_and_never_returned(monkeypatch):
         assert secret not in response.text
         assert response.json()["api_key_configured"] is True
         assert "encrypted_api_key" not in response.text
+        me = client.get("/api/v1/auth/me")
+        assert me.status_code == 200
+        with TestingSessionLocal() as db:
+            provider, base_url, decrypted_key, model = _text_provider(db, me.json()["id"])
+            assert provider == "DeepSeek"
+            assert base_url == "https://api.example.com/v1"
+            assert decrypted_key == secret
+            assert model == "deepseek-chat"
+        tools = client.get("/api/v1/ai-tools")
+        assert tools.status_code == 200
+        assert tools.json()["modes"][0]["capabilities"]["text"] is True
         listing = client.get("/api/v1/ai-provider-configs")
         assert listing.status_code == 200
         assert secret not in listing.text
