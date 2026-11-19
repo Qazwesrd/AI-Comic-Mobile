@@ -90,4 +90,3 @@ def list_ai_tool_modes(user=Depends(get_current_user)):
             "应用可用地区、账号、套餐、额度和导出能力由第三方服务商决定",
         ],
     }
-}
