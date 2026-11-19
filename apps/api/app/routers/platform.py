@@ -398,6 +398,7 @@ async def analyze_novel(
     chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no).offset(offset).limit(limit)).all()
     if not chapters:
         raise HTTPException(status_code=404, detail="没有可解析的章节")
+    total_chapters = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
     results = []
     entities_created = 0
     for chapter in chapters:
@@ -436,10 +437,10 @@ async def analyze_novel(
                     ))
                     entities_created += 1
         results.append({"chapter_no": chapter.chapter_no, "analysis": result})
-    total_chapters = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
-    novel.analysis_status = "analyzed" if len(results) >= total_chapters else "partially_analyzed"
+    has_more = offset + len(results) < total_chapters
+    novel.analysis_status = "partially_analyzed" if has_more else "analyzed"
     db.commit()
-    return {"novel_id": novel.id, "processed_chapters": len(results), "entities_created": entities_created, "results": results,
+    return {"novel_id": novel.id, "processed_chapters": len(results), "next_offset": offset + len(results), "has_more": has_more, "entities_created": entities_created, "results": results,
             "message": "章节解析已完成；请人工审核人物、场景、道具和关系识别结果"}
 
 
