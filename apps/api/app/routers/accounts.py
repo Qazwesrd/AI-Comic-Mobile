@@ -95,8 +95,6 @@ def login(payload: CredentialsIn, request: Request, response: Response, db: Sess
         db.commit()
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已停用")
-    if settings.require_email_verification and not user.email_verified:
-        raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     return _issue_session(user, db, response)
 
 
