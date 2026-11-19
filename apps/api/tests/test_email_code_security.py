@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from unittest.mock import patch
 
 from app.database import Base
 from app.models import User
@@ -40,8 +41,9 @@ def test_resending_email_code_invalidates_previous_code():
         db.commit()
         db.refresh(user)
 
-        old_code = create_one_time_code(db, user, "register_email_code", 10)
-        new_code = create_one_time_code(db, user, "register_email_code", 10)
+        with patch("app.security_services.secrets.randbelow", side_effect=[123456, 654321]):
+            old_code = create_one_time_code(db, user, "register_email_code", 10)
+            new_code = create_one_time_code(db, user, "register_email_code", 10)
 
         assert consume_one_time_code(db, user, old_code, "register_email_code") is False
         assert consume_one_time_code(db, user, new_code, "register_email_code") is True
