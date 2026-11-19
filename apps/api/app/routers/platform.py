@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -32,6 +32,20 @@ router = APIRouter(prefix="/api/v1", tags=["platform"])
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user
+
+
+def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+    record = db.scalar(select(License).where(License.user_id == user.id))
+    if record is None or not record.trial_started_at:
+        raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
+    if record.permanent:
+        return user
+    started = record.trial_started_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) >= started + timedelta(hours=settings.trial_hours):
+        raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     return user
 
 
@@ -179,6 +193,8 @@ def create_order(
     payload: OrderCreateIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"create-order:{request_fingerprint(request)}", 10, 3600)
+    if settings.require_email_verification and not user.email_verified:
+        raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     code = payload.product_code
     product = db.scalar(select(Product).where(Product.code == code, Product.active.is_(True)))
     if product is None:
@@ -341,7 +357,7 @@ def admin_audit(admin: User = Depends(require_admin), db: Session = Depends(get_
 
 
 @router.post("/projects")
-def create_project(payload: ProjectIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_project(payload: ProjectIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     item = Project(user_id=user.id, **payload.model_dump())
     db.add(item)
     db.commit()
@@ -356,7 +372,7 @@ def list_projects(user: User = Depends(get_current_user), db: Session = Depends(
 
 
 @router.post("/projects/{project_id}/novels")
-def import_novel(project_id: int, payload: NovelIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if project is None:
         raise HTTPException(status_code=404, detail="项目不存在")
@@ -387,7 +403,7 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(get_cur
 @router.post("/projects/{project_id}/novels/{novel_id}/analyze")
 async def analyze_novel(
     project_id: int, novel_id: int, limit: int = 10, offset: int = 0,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     if limit < 1 or limit > 20 or offset < 0:
         raise HTTPException(status_code=422, detail="每次最多解析20章")
@@ -444,10 +460,18 @@ async def analyze_novel(
             "message": "章节解析已完成；请人工审核人物、场景、道具和关系识别结果"}
 
 
+def _license_expired(started_at: datetime) -> bool:
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= started_at + timedelta(hours=settings.trial_hours)
+
+
 async def _generate_artifact(
     artifact_type: str, project_id: int, novel_id: int, payload: ArtifactRequest,
     user: User, db: Session,
 ):
+    if not user.license or (not user.license.permanent and (not user.license.trial_started_at or _license_expired(user.license.trial_started_at))):
+        raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
     chapter = db.scalar(select(Chapter).where(Chapter.novel_id == novel_id, Chapter.chapter_no == payload.chapter_no))
@@ -474,7 +498,7 @@ async def _generate_artifact(
 @router.post("/projects/{project_id}/novels/{novel_id}/script")
 async def generate_script(
     project_id: int, novel_id: int, payload: ArtifactRequest,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     return await _generate_artifact("script", project_id, novel_id, payload, user, db)
 
@@ -482,7 +506,7 @@ async def generate_script(
 @router.post("/projects/{project_id}/novels/{novel_id}/storyboard")
 async def generate_storyboard(
     project_id: int, novel_id: int, payload: ArtifactRequest,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     return await _generate_artifact("storyboard", project_id, novel_id, payload, user, db)
 
@@ -521,7 +545,7 @@ def list_story_entities(
 @router.patch("/projects/{project_id}/novels/{novel_id}/entities/{entity_id}")
 def review_story_entity(
     project_id: int, novel_id: int, entity_id: int, payload: EntityReviewIn,
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
@@ -537,7 +561,7 @@ def review_story_entity(
 
 
 @router.post("/publishing/jobs")
-def create_publish_job(payload: PublishIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_publish_job(payload: PublishIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     item = PublishJob(
         user_id=user.id, platform=payload.platform, title=payload.title,
         description=payload.description, media_url=payload.media_url,
