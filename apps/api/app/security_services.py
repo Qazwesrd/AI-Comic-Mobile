@@ -6,7 +6,9 @@ import hashlib
 import hmac
 import secrets
 import smtplib
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.orm import Session
 
 from .config import settings
@@ -52,7 +54,10 @@ def consume_one_time_token(db: Session, raw: str, purpose: str) -> User | None:
     user = db.get(User, record.user_id)
     if user is None:
         return None
-    record.used_at = utc_now()
+    claimed = db.execute(update(OneTimeToken).where(OneTimeToken.id == record.id, OneTimeToken.used_at.is_(None)).values(used_at=utc_now()))
+    if claimed.rowcount != 1:
+        db.rollback()
+        return None
     db.commit()
     return user
 
@@ -77,20 +82,34 @@ def send_account_email(recipient: str, subject: str, text_body: str) -> bool:
 def enforce_rate_limit(db: Session, key: str, limit: int, window_seconds: int) -> None:
     now = utc_now()
     start = datetime.fromtimestamp(int(now.timestamp()) // window_seconds * window_seconds, tz=timezone.utc)
-    bucket = db.scalar(select(RateLimitBucket).where(
-        RateLimitBucket.bucket_key == key,
-        RateLimitBucket.window_start == start,
-    ))
-    if bucket is None:
-        bucket = RateLimitBucket(bucket_key=key, window_start=start, count=0)
-        db.add(bucket)
-        db.flush()
-    if bucket.count >= limit:
+    values = {"bucket_key": key, "window_start": start, "count": 1}
+    dialect = db.bind.dialect.name if db.bind is not None else ""
+    if dialect == "sqlite":
+        statement = sqlite_insert(RateLimitBucket).values(**values).on_conflict_do_update(
+            index_elements=["bucket_key", "window_start"],
+            set_={"count": RateLimitBucket.count + 1},
+        ).returning(RateLimitBucket.count)
+        count = db.scalar(statement)
+    elif dialect == "postgresql":
+        statement = postgres_insert(RateLimitBucket).values(**values).on_conflict_do_update(
+            index_elements=["bucket_key", "window_start"],
+            set_={"count": RateLimitBucket.count + 1},
+        ).returning(RateLimitBucket.count)
+        count = db.scalar(statement)
+    else:
+        bucket = db.scalar(select(RateLimitBucket).where(RateLimitBucket.bucket_key == key, RateLimitBucket.window_start == start))
+        if bucket is None:
+            bucket = RateLimitBucket(**values)
+            db.add(bucket)
+            db.flush()
+        else:
+            bucket.count += 1
+        count = bucket.count
+    if count > limit:
+        db.rollback()
         from fastapi import HTTPException
         raise HTTPException(status_code=429, detail="操作过于频繁，请稍后再试")
-    bucket.count += 1
     db.commit()
-
 
 def request_fingerprint(request) -> str:
     address = request.client.host if request.client else "unknown"
