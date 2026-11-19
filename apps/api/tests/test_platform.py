@@ -235,6 +235,15 @@ def test_trial_is_exactly_48_hours_even_if_environment_setting_differs(monkeypat
             db.commit()
         finally:
             db.close()
+        status_response = client.get("/api/v1/license/status")
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "expired"
+        assert status_response.json()["remaining_seconds"] == 0
+        from datetime import datetime
+        started_at = datetime.fromisoformat(status_response.json()["trial_started_at"])
+        expires_at = datetime.fromisoformat(status_response.json()["trial_expires_at"])
+        assert int((expires_at - started_at).total_seconds()) == 48 * 3600
+
         blocked = client.post("/api/v1/projects", headers=headers, json={"title": "49小时后不能创建"})
         assert blocked.status_code == 402
 
