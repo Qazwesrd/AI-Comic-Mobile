@@ -16,7 +16,7 @@ class CredentialsIn(BaseModel):
 
 class EmailCodeIn(BaseModel):
     email: str = Field(min_length=5, max_length=320)
-    code: str = Field(min_length=6, max_length=6, pattern=r"^\\d{6}$")
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
     @field_validator("email")
     @classmethod
