@@ -16,7 +16,12 @@ type License = {
   message: string;
 };
 
-export default function AccountPage() {\n  async function openOfficialPayment() {\n    const url = "https://ai-comic-mobile.pages.dev/store/";\n    if (Capacitor.isNativePlatform()) await AppLauncher.openUrl({ url });\n    else window.location.href = url;\n  }
+export default function AccountPage() {
+  async function openOfficialPayment() {
+    const url = "https://ai-comic-mobile.pages.dev/store/";
+    if (Capacitor.isNativePlatform()) await AppLauncher.openUrl({ url });
+    else window.location.href = url;
+  }
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
