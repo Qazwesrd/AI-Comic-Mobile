@@ -52,3 +52,6 @@ if settings.app_env == "production" and settings.require_email_verification:
         raise RuntimeError("SMTP settings are required when email verification is enforced.")
 if settings.app_env == "production" and not settings.token_pepper:
     raise RuntimeError("TOKEN_PEPPER must be configured in production.")
+
+if settings.app_env == "production" and not settings.require_email_verification:
+    raise RuntimeError("REQUIRE_EMAIL_VERIFICATION must be enabled in production.")
