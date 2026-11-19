@@ -75,7 +75,7 @@ def test_visual_generation_requires_provider_configuration(monkeypatch):
         entity = StoryEntity(
             entity_uuid="11111111-2222-4333-8444-555555555555",
             novel_id=novel_id, entity_type="character", canonical_name="主角",
-            description="穿着蓝色外套的年轻冒险者",
+            description="穿着蓝色外套的年轻冒险者", approved=True,
         )
         db.add(entity)
         db.commit()
