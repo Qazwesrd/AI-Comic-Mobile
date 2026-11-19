@@ -37,7 +37,7 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-    if settings.require_email_verification and not user.email_verified:
+    if settings.require_email_verification and not (user.email_verified or user.phone_verified):
         raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
     if record is None:
