@@ -436,6 +436,22 @@ def list_projects(user: User = Depends(get_current_user), db: Session = Depends(
     return [{"id": p.id, "title": p.title, "description": p.description, "status": p.status} for p in rows]
 
 
+@router.get("/projects/{project_id}/novels")
+def list_project_novels(
+    project_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    novels = db.scalars(select(Novel).where(Novel.project_id == project_id).order_by(desc(Novel.id))).all()
+    return [{
+        "id": novel.id,
+        "title": novel.title,
+        "analysis_status": novel.analysis_status,
+        "chapter_count": db.query(Chapter).filter(Chapter.novel_id == novel.id).count(),
+    } for novel in novels]
+
+
 @router.post("/projects/{project_id}/novels")
 def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
