@@ -140,7 +140,13 @@ export default function ProjectsPage() {
       return;
     }
     try {
-      const value = await file.text();
+      const buffer = await file.arrayBuffer();
+      let value: string;
+      try {
+        value = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      } catch {
+        value = new TextDecoder("gb18030").decode(buffer);
+      }
       setText(value);
       setNovelTitle(file.name.replace(/\.txt$/i, "") || "我的小说");
       setMessage(`已读取文件：${file.name}，共 ${value.length.toLocaleString()} 个字符。请确认后导入。`);
