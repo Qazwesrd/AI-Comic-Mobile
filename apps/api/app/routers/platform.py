@@ -30,13 +30,13 @@ from ..security_services import (
 router = APIRouter(prefix="/api/v1", tags=["platform"])
 
 
-def require_admin(user: User = Depends(require_active_license)) -> User:
+def require_admin(user: User = Depends(get_current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
 
 
-def require_active_license(user: User = Depends(require_active_license), db: Session = Depends(get_db)) -> User:
+def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
     if settings.require_email_verification and not (user.email_verified or user.phone_verified):
         raise HTTPException(status_code=403, detail="请先完成手机号或邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
@@ -200,7 +200,7 @@ def list_products(db: Session = Depends(get_db)):
 
 @router.post("/orders")
 def create_order(
-    payload: OrderCreateIn, request: Request, user: User = Depends(require_active_license), db: Session = Depends(get_db)
+    payload: OrderCreateIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"create-order:{request_fingerprint(request)}", 10, 3600)
     if settings.require_email_verification and not (user.email_verified or user.phone_verified):
@@ -228,7 +228,7 @@ def create_order(
 
 
 @router.get("/orders")
-def my_orders(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def my_orders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(Order).where(Order.user_id == user.id).order_by(desc(Order.created_at)).limit(100)).all()
     return [{"order_no": o.order_no, "status": o.status, "amount_minor": o.amount_minor,
              "currency": o.currency, "created_at": _safe_dt(o.created_at), "paid_at": _safe_dt(o.paid_at)} for o in rows]
@@ -322,14 +322,14 @@ def admin_confirm_manual_payment(
 
 
 @router.get("/devices")
-def list_devices(user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def list_devices(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     devices = db.scalars(select(DeviceActivation).where(DeviceActivation.user_id == user.id)).all()
     return [{"device_id": d.device_id, "platform": d.platform,
              "first_seen_at": _safe_dt(d.first_seen_at), "last_seen_at": _safe_dt(d.last_seen_at)} for d in devices]
 
 
 @router.delete("/devices/{device_id}")
-def remove_device(device_id: str, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
+def remove_device(device_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     device = db.scalar(select(DeviceActivation).where(
         DeviceActivation.user_id == user.id, DeviceActivation.device_id == device_id
     ))
