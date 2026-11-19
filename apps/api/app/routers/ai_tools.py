@@ -65,7 +65,7 @@ def list_ai_tool_modes(user=Depends(get_current_user)):
                 "description": "软件后端调用已配置的模型服务，密钥不会返回到手机端。",
                 "configured": text_ready,
                 "capabilities": {"text": text_ready, "image": image_ready, "audio": audio_ready},
-                "configuration_note": "当前由部署环境配置 AI_API_BASE_URL / AI_API_KEY / AI_MODEL、IMAGE_API_* 和 AUDIO_API_*。账号级自助配置将在后续阶段实现。",
+                "configuration_note": "用户可在 AI 服务配置中心配置自己的文本、图片和语音服务；未配置个人服务时，兼容使用部署方提供的默认服务。",
             },
             {
                 "id": "android-client", "name": "手机已安装的 AI 客户端",
