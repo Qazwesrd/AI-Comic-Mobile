@@ -124,6 +124,7 @@ def test_payment_webhook_rejects_invalid_signature(monkeypatch):
 
 def test_admin_manual_payment_confirmation_grants_only_matching_30_cny_order(monkeypatch):
     monkeypatch.setattr(settings, "admin_bootstrap_emails", "owner@example.com")
+    monkeypatch.setattr(settings, "require_email_verification", False)
     with TestClient(app, base_url="http://localhost:3000") as client:
         buyer_csrf = register(client, "manual-buyer@example.com")
         admin_csrf = register(client, "owner@example.com")
