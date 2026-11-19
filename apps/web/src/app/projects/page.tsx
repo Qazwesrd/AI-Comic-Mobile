@@ -1,9 +1,11 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 
 type Project = { id: number; title: string; description: string; status: string };
 type NovelSummary = { id: number; title: string; analysis_status: string; chapter_count: number; analyzed_chapter_count: number };
