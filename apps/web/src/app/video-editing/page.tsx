@@ -25,6 +25,7 @@ export default function VideoEditingPage() {
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
   const [revision,setRevision]=useState(0);
+  const [keyframes,setKeyframes]=useState<Record<number,{asset_id:number;timestamp_ms:number;file_name:string}[]>>({});
 
   async function loadProjects() {
     const response=await fetch(API+"/api/v1/video-editing/projects",{credentials:"include"});
@@ -67,6 +68,32 @@ export default function VideoEditingPage() {
     }catch(e){setMessage(e instanceof Error?e.message:"添加失败");}
     finally{setBusy(false);}
   }
+  async function extractKeyframes(sourceId:number) {
+    if(!selected)return;
+    setBusy(true);setMessage("");
+    try {
+      const headers=await csrfHeaders();
+      const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/sources/"+sourceId+"/keyframes?interval_seconds=5",{method:"POST",credentials:"include",headers});
+      const data=await response.json();if(!response.ok)throw new Error(data.detail||"关键帧提取失败");
+      setKeyframes(items=>({...items,[sourceId]:data.frames||[]}));
+      await loadAssets();
+      setMessage("已提取 "+data.count+" 张关键帧。它们已保存为待审核图片，可交给支持图片理解的 AI 客户端分析。");
+    }catch(e){setMessage(e instanceof Error?e.message:"关键帧提取失败");}
+    finally{setBusy(false);}
+  }
+  async function exportVideo() {
+    if(!selected)return;
+    setBusy(true);setMessage("");
+    try {
+      const headers=await csrfHeaders();
+      const response=await fetch(API+"/api/v1/video-editing/projects/"+selected.id+"/export",{method:"POST",credentials:"include",headers,body:JSON.stringify({resolution:selected.aspect_ratio==="9:16"?"1080x1920":selected.aspect_ratio==="1:1"?"1080x1080":"1920x1080",fps:30})});
+      const data=await response.json();if(!response.ok)throw new Error(data.detail||"视频导出失败");
+      await loadAssets();
+      setMessage("视频导出完成，成片已保存到素材库，素材编号："+data.asset_id+"。");
+    }catch(e){setMessage(e instanceof Error?e.message:"视频导出失败");}
+    finally{setBusy(false);}
+  }
+
   async function createPlan() {
     if(!selected||instruction.trim().length<3)return;
     setBusy(true);setPlan(null);
@@ -128,16 +155,16 @@ export default function VideoEditingPage() {
             <button className="account-submit" disabled={busy||!assetId} onClick={()=>void attachSource()}>添加到当前项目</button>
           </div>
           <h3>项目视频素材</h3>
-          {sources.map(source=><article className="portal-card" key={source.id}><strong>{source.title}</strong><p>{source.file_name} · 媒体探测：{source.probe_status}{source.duration_ms?" · "+(source.duration_ms/1000).toFixed(1)+"秒":" · 时长尚未探测"}</p><button className="account-submit" onClick={()=>addClip(source.id)}>添加5秒片段到时间线</button></article>)}
+          {sources.map(source=><article className="portal-card" key={source.id}><strong>{source.title}</strong><p>{source.file_name} · 媒体探测：{source.probe_status}{source.duration_ms?" · "+(source.duration_ms/1000).toFixed(1)+"秒":" · 时长尚未探测"}</p><button className="account-submit" onClick={()=>addClip(source.id)}>添加5秒片段到时间线</button><button className="account-submit" disabled={busy||!source.duration_ms} onClick={()=>void extractKeyframes(source.id)}>提取关键帧（每5秒）</button>{(keyframes[source.id]||[]).map(frame=><p key={frame.asset_id}>关键帧 {Math.round(frame.timestamp_ms/1000)}秒 · 素材 #{frame.asset_id} · <a href={API+"/api/v1/assets/"+frame.asset_id+"/download"} target="_blank" rel="noreferrer">查看图片</a></p>)}</article>)}
           <h3>AI文字剪辑指令</h3>
           <div className="account-form">
             <label>告诉AI你想怎样剪辑<textarea rows={4} value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="例如：保留节奏紧凑的部分，删除停顿，按时间顺序组合，输出竖屏短视频。"/></label>
             <button className="account-submit" disabled={busy||sources.length===0||instruction.trim().length<3} onClick={()=>void createPlan()}>{busy?"处理中…":"生成AI剪辑建议"}</button>
           </div>
-          <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} />
+          <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} keyframes={sources.flatMap(source=>(keyframes[source.id]||[]).map(frame=>({...frame,source_id:source.id})))} />
           {plan&&<article className="portal-card"><strong>AI建议（草稿）</strong><p>{plan.summary}</p>{plan.limitations.map((x,i)=><p key={i}>注意：{x}</p>)}<p>建议片段：{plan.clips.length}</p><button className="account-submit" disabled={!plan.clips.length} onClick={applyPlan}>应用到时间线</button></article>}
           <h3>时间线 · 版本 {revision}</h3>
-          <p>当前提供基础视频轨道片段编辑；高级多轨、波形、转场预览与正式渲染将在后续阶段继续完善。</p>
+          <p>可提取关键帧交给支持图片理解的 AI 客户端；视频轨道可编辑并导出 MP4，支持可选背景音乐接口。</p>
           {clips.map((clip,index)=><article className="portal-card" key={clip.id}>
             <strong>片段 {index+1} · 源素材 #{clip.source_id}</strong>
             <div className="account-form">
@@ -147,10 +174,10 @@ export default function VideoEditingPage() {
               <button className="account-submit" onClick={()=>setClips(items=>items.filter(x=>x.id!==clip.id))}>移除此片段</button>
             </div>
           </article>)}
-          <button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void saveTimeline()}>保存时间线版本</button>
+          <button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void saveTimeline()}>保存时间线版本</button><button className="account-submit" disabled={busy||clips.length===0} onClick={()=>void exportVideo()}>{busy?"处理中…":"导出 MP4 成片"}</button>
         </div>}
         <p className="account-message">{message}</p>
-        <p style={{fontSize:11,color:"#8c90b2"}}>当前阶段已实现项目/素材关联、基础时间线版本保存与AI结构化剪辑计划入口。视频画面理解、自动镜头识别、媒体时长探测和成片渲染尚未接通；没有配置AI服务时，AI建议不可用。</p>
+        <p style={{fontSize:11,color:"#8c90b2"}}>关键帧提取仅负责抽帧，不代表软件已自动理解画面；AI 视觉分析仍需通过支持图片理解的客户端或已配置视觉模型完成。MP4 导出由服务端 FFmpeg 执行，原始视频不会覆盖。</p>
       </div>
     </section>
   </main>;
