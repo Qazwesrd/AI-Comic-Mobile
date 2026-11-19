@@ -18,7 +18,9 @@ def _body_map(response) -> dict:
 
 
 def _value(data: dict, key: str):
-    return data.get(key, data.get(key[:1].upper() + key[1:]))
+    pascal = "".join(part.capitalize() for part in key.split("_"))
+    camel = key.split("_")[0] + "".join(part.capitalize() for part in key.split("_")[1:])
+    return data.get(key, data.get(camel, data.get(pascal)))
 
 
 def _client():
