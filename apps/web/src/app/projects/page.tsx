@@ -243,6 +243,34 @@ export default function ProjectsPage() {
     }
   }
 
+  async function approveAllPendingEntities() {
+    if (!selected || !novelId) return;
+    const pending = entities.filter(entity => !entity.approved);
+    if (!pending.length) return;
+    if (!window.confirm(`确认已逐项检查这 ${pending.length} 项人物、场景或道具，并全部通过审核吗？审核通过后即可生成参考图。`)) return;
+    setBusy(true);
+    let approved = 0;
+    try {
+      for (const entity of pending) {
+        const response = await fetch(`${API}/api/v1/projects/${selected}/novels/${novelId}/entities/${entity.id}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: await csrfHeaders(),
+          body: JSON.stringify({ approved: true }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || `${entity.name} 审核失败`);
+        approved += 1;
+        setEntities(items => items.map(item => item.id === entity.id ? { ...item, approved: Boolean(data.approved) } : item));
+      }
+      setMessage(`已完成批量审核：${approved} 项素材全部确认。`);
+    } catch (error) {
+      setMessage(`${error instanceof Error ? error.message : "批量审核中断"}；已成功确认 ${approved} 项，其余素材仍可逐项审核或重试。`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approveEntity(entity: Entity) {
     if (!selected || !novelId) return;
     try {
@@ -426,6 +454,8 @@ export default function ProjectsPage() {
               <p className="project-tip">AI 解析需要先在 AI 配置中心启用文本模型。每批最多解析 10 章，避免一次处理过多内容。</p>
 
               <div className="project-list-heading"><h3>识别素材审核</h3><span>人物 {characterCount} · 场景 {sceneCount} · 道具 {propCount}</span></div>
+              {entities.some(entity => !entity.approved) && <button type="button" className="account-submit secondary" disabled={busy} onClick={() => void approveAllPendingEntities()}>全部确认待审核素材（{entities.filter(entity => !entity.approved).length} 项）</button>}
+              <p className="project-tip">建议先核对每项名称和描述，再使用批量确认；也可以继续在下方逐项确认或取消确认。</p>
               {chapterAnalyses.some(chapter => chapter.analyzed) && <div className="project-chapter-analysis"><div className="project-list-heading"><h3>章节深度分析记录</h3><span>{chapterAnalyses.filter(chapter => chapter.analyzed).length}/{chapterAnalyses.length} 章已分析</span></div>{chapterAnalyses.filter(chapter => chapter.analyzed).map(chapter => <details className="project-result" key={chapter.chapter_no}><summary>第 {chapter.chapter_no} 章 · {chapter.title}</summary><div className="project-analysis-body"><strong>章节摘要</strong><p>{String(chapter.analysis?.summary || "暂无摘要")}</p>{(["events","relationships","timeline","continuity_notes"] as const).map(key => { const value = chapter.analysis?.[key]; return value ? <section key={key}><strong>{{events:"关键事件",relationships:"人物关系",timeline:"时间线",continuity_notes:"连续性提示"}[key]}</strong><pre className="artifact-output">{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre></section> : null; })}</div></details>)}</div>}
               {entities.length > 0 ? (
                 <>
