@@ -42,3 +42,9 @@ if settings.session_cookie_samesite.lower() not in {"lax", "strict", "none"}:
 if settings.app_env == "production" and settings.session_cookie_samesite.lower() == "none":
     # SameSite=None is valid only with Secure cookies.
     pass
+
+if settings.app_env == "production" and settings.require_email_verification:
+    if not all([settings.smtp_host, settings.smtp_from_email]):
+        raise RuntimeError("SMTP settings are required when email verification is enforced.")
+if settings.app_env == "production" and not settings.token_pepper:
+    raise RuntimeError("TOKEN_PEPPER must be configured in production.")
