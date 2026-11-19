@@ -71,10 +71,10 @@ def _send_registration_code(user: User, request: Request, db: Session) -> dict[s
             "AI 漫剧手机版注册验证码",
             f"你的注册验证码是：{code}\\n\\n验证码10分钟内有效，请勿向任何人透露。",
         )
-    except Exception:
+    except RuntimeError as exc:
         raise HTTPException(
             status_code=502,
-            detail="验证码邮件发送失败。账号信息已暂存，请检查邮件服务配置后重新发送。",
+            detail=f"验证码邮件发送失败（{exc}）。账号信息已暂存，可以稍后重新发送。",
         ) from None
     return {"message": "验证码已发送，请查收邮箱（也请检查垃圾邮件文件夹）。验证码10分钟内有效。"}
 
