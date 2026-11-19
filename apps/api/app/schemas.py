@@ -14,6 +14,19 @@ class CredentialsIn(BaseModel):
         return normalized
 
 
+class EmailCodeIn(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\\d{6}$")
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized.count("@") != 1 or "." not in normalized.rsplit("@", 1)[-1]:
+            raise ValueError("请输入有效的邮箱地址")
+        return normalized
+
+
 class DeviceActivationIn(BaseModel):
     device_id: str = Field(min_length=8, max_length=128)
     platform: str = Field(default="unknown", max_length=24)
