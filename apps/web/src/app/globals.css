@@ -83,3 +83,19 @@ a { color: inherit; text-decoration: none; }
 .account-message.ok { color: #72efc2; }
 .account-status { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 13px; line-height: 1.8; }
 .account-back { display: inline-block; margin-bottom: 20px; color: var(--cyan); font-size: 12px; }
+
+.portal-nav { width:min(1080px,100%); margin:-34px auto 42px; display:flex; flex-wrap:wrap; gap:10px; }
+.portal-nav a { border:1px solid var(--line); border-radius:999px; padding:9px 13px; color:#bfc2df; font-size:11px; background:rgba(20,22,48,.65); }
+.portal-nav a:hover { border-color:var(--cyan); color:var(--cyan); }
+.portal-card { display:grid; gap:8px; margin:14px 0; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(7,10,27,.68); color:#d9daf0; }
+.portal-card p { margin:0; color:var(--muted); font-size:12px; line-height:1.7; }
+.portal-card small { color:#9ca1c6; line-height:1.6; }
+.portal-card button { width:fit-content; }
+.project-select { width:100%; text-align:left; cursor:pointer; }
+.project-select.selected { border-color:var(--cyan); }
+.account-form textarea, .account-form select { width:100%; border:1px solid rgba(133,139,207,.28); border-radius:9px; padding:13px; outline:none; background:rgba(4,6,19,.8); color:white; font:inherit; }
+.account-form textarea:focus, .account-form select:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(54,232,255,.08); }
+.account-form h2 { margin:18px 0 4px; font-size:17px; }
+.account-form button:disabled { opacity:.6; cursor:not-allowed; }
+
+.artifact-output { max-height:420px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; border:1px solid var(--line); border-radius:10px; padding:14px; background:rgba(3,5,18,.88); color:#c7f5ff; font-size:11px; line-height:1.7; }
