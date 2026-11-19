@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
-type License = {
+type Device = { device_id: string; platform: string; first_seen_at: string; last_seen_at: string };\n\ntype License = {
   status: string;
   permanent: boolean;
   trial_expires_at: string | null;
@@ -19,10 +19,10 @@ export default function AccountPage() {
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [license, setLicense] = useState<License | null>(null);
-  const [csrfToken, setCsrfToken] = useState("");
+  const [csrfToken, setCsrfToken] = useState("");\n  const [devices, setDevices] = useState<Device[]>([]);
   const [busy, setBusy] = useState(false);
 
-  async function loadLicense(csrf: string) {
+  async function loadDevices() {\n    const response = await fetch(`${API}/api/v1/devices`, { credentials: "include" });\n    if (response.ok) setDevices(await response.json() as Device[]);\n  }\n\n  async function loadLicense(csrf: string) {
     const deviceId = localStorage.getItem("ai-comic-device-id") || crypto.randomUUID();
     localStorage.setItem("ai-comic-device-id", deviceId);
     const platform = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "ios" :
@@ -48,7 +48,7 @@ export default function AccountPage() {
         const data = await csrfResponse.json() as { csrf_token: string };
         if (cancelled) return;
         setCsrfToken(data.csrf_token);
-        await loadLicense(data.csrf_token);
+        await loadLicense(data.csrf_token);\n        await loadDevices();
       } catch {
         if (!cancelled) setMessage("暂时无法连接账号服务，请检查网络后重试。");
       }
@@ -74,7 +74,7 @@ export default function AccountPage() {
       const csrf = String(data.csrf_token || "");
       if (!csrf) throw new Error("安全会话建立失败，请重试");
       setCsrfToken(csrf);
-      await loadLicense(csrf);
+      await loadLicense(csrf);\n      await loadDevices();
       setSuccess(true);
       setMessage("登录成功，账号与试用状态已连接。");
       setPassword("");
@@ -85,7 +85,7 @@ export default function AccountPage() {
     }
   }
 
-  async function sendVerification() {
+  async function removeDevice(deviceId: string) {\n    try {\n      const response = await fetch(`${API}/api/v1/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": csrfToken } });\n      const data = await response.json();\n      if (!response.ok) throw new Error(data.detail || "解除设备失败");\n      setDevices(items => items.filter(item => item.device_id !== deviceId));\n      setMessage(data.message); setSuccess(true);\n    } catch (error) { setMessage(error instanceof Error ? error.message : "解除设备失败"); setSuccess(false); }\n  }\n\n  async function sendVerification() {
     try {
       const response = await fetch(`${API}/api/v1/auth/email/verify/request`, {
         method: "POST", credentials: "include", headers: { "X-CSRF-Token": csrfToken }
@@ -150,7 +150,7 @@ export default function AccountPage() {
           <p className={`account-message ${success ? "ok" : ""}`}>{message}</p>
           {license && (
             <div className="account-status">
-              <strong>{license.message}</strong><br />\n              <button type="button" className="account-submit" onClick={() => void sendVerification()}>发送邮箱验证邮件</button><br />
+              <strong>{license.message}</strong><br />\n              <h3>已绑定设备（最多3台）</h3>{devices.map(device => <div className="portal-card" key={device.device_id}><strong>{device.platform}</strong><small>{device.device_id}</small><button type="button" className="account-submit" onClick={() => void removeDevice(device.device_id)}>解除此设备</button></div>)}<br />\n              <button type="button" className="account-submit" onClick={() => void sendVerification()}>发送邮箱验证邮件</button><br />
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
               {license.status === "expired" && "请前往官网购买永久授权。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
