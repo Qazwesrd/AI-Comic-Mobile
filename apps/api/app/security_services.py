@@ -6,7 +6,6 @@ import hashlib
 import base64
 import hmac
 import secrets
-import smtplib
 import httpx
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
