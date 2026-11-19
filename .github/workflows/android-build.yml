@@ -43,6 +43,8 @@ jobs:
         run: npx cap add android
       - name: Configure native Android share receiver
         run: python scripts/configure-android-share.py
+      - name: Configure native Android AI client launcher
+        run: python scripts/configure-android-ai-launcher.py
       - name: Declare verified AI client packages for Android 11+
         run: |
           python - <<'PY'
@@ -69,7 +71,14 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
       - name: Build debug APK
-        run: cd android && ./gradlew assembleDebug
+        run: |
+          cd android
+          for attempt in 1 2 3; do
+            echo "Android build attempt ${attempt}/3"
+            if ./gradlew --no-daemon assembleDebug; then exit 0; fi
+            if [ "${attempt}" -lt 3 ]; then sleep 20; fi
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: ai-comic-mobile-android-debug
