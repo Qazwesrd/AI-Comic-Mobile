@@ -32,9 +32,34 @@ class DeviceActivationIn(BaseModel):
     platform: str = Field(default="unknown", max_length=24)
 
 
+class PhoneCredentialsIn(BaseModel):
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+    password: str = Field(min_length=10, max_length=128)
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: str) -> str:
+        return value.strip()
+
+
+class PhoneCodeIn(BaseModel):
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: str) -> str:
+        return value.strip()
+
+
+class PhoneRegisterVerifyIn(PhoneCodeIn):
+    code: str = Field(min_length=4, max_length=8, pattern=r"^\d{4,8}$")
+    password: str = Field(min_length=10, max_length=128)
+
+
 class UserOut(BaseModel):
     id: int
-    email: str
+    email: str | None = None
+    phone: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
