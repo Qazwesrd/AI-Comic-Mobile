@@ -125,7 +125,7 @@ class EntityReviewIn(BaseModel):
 
 
 class PublishIn(BaseModel):
-    platform: str = Field(pattern="^(douyin|hongguo|kuaishou)$")
+    platform: str = Field(pattern="^(douyin|hongguo|kuaishou|fanqie)$")
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     media_url: str = Field(min_length=8, max_length=2048)
