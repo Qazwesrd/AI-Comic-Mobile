@@ -125,30 +125,30 @@ def test_payment_webhook_rejects_invalid_signature(monkeypatch):
 def test_admin_manual_payment_confirmation_grants_only_matching_30_cny_order(monkeypatch):
     monkeypatch.setattr(settings, "admin_bootstrap_emails", "owner@example.com")
     monkeypatch.setattr(settings, "require_email_verification", False)
-    with TestClient(app, base_url="http://localhost:3000") as client:
-        buyer_csrf = register(client, "manual-buyer@example.com")
-        admin_csrf = register(client, "owner@example.com")
-        buyer_headers = {"X-CSRF-Token": buyer_csrf, "Origin": "http://localhost:3000"}
+    with TestClient(app, base_url="http://localhost:3000") as admin_client, TestClient(app, base_url="http://localhost:3000") as buyer_client:
+        admin_csrf = register(admin_client, "owner@example.com")
+        buyer_csrf = register(buyer_client, "manual-buyer@example.com")
         admin_headers = {"X-CSRF-Token": admin_csrf, "Origin": "http://localhost:3000"}
-        created_product = client.post("/api/v1/admin/products", headers=admin_headers, json={
+        buyer_headers = {"X-CSRF-Token": buyer_csrf, "Origin": "http://localhost:3000"}
+        created_product = admin_client.post("/api/v1/admin/products", headers=admin_headers, json={
             "code": "permanent-license", "name": "永久授权", "description": "一次性授权",
             "amount_minor": 3000, "currency": "CNY", "grants_permanent_license": True,
         })
         assert created_product.status_code == 200
-        order_response = client.post("/api/v1/orders", headers=buyer_headers,
-                                     json={"product_code": "permanent-license"})
-        assert order_response.status_code == 200
+        order_response = buyer_client.post("/api/v1/orders", headers=buyer_headers,
+                                           json={"product_code": "permanent-license"})
+        assert order_response.status_code == 200, order_response.text
         order_no = order_response.json()["order_no"]
         assert order_response.json()["status"] == "pending"
-        denied = client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
-                             headers=buyer_headers, json={"transaction_id": "wx-txn-001"})
+        denied = buyer_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                   headers=buyer_headers, json={"transaction_id": "wx-txn-001"})
         assert denied.status_code == 403
-        confirmed = client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
-                                headers=admin_headers, json={"transaction_id": "wx-txn-001", "note": "到账核实"})
+        confirmed = admin_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                      headers=admin_headers, json={"transaction_id": "wx-txn-001", "note": "到账核实"})
         assert confirmed.status_code == 200
         assert confirmed.json()["permanent_license_granted"] is True
-        duplicate = client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
-                                headers=admin_headers, json={"transaction_id": "wx-txn-001"})
+        duplicate = admin_client.post(f"/api/v1/admin/orders/{order_no}/confirm-paid",
+                                      headers=admin_headers, json={"transaction_id": "wx-txn-001"})
         assert duplicate.status_code == 409
 
 
