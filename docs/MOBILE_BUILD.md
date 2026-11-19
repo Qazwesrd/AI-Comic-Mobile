@@ -6,21 +6,30 @@
 - Android App：通过 Capacitor 将独立的软件工作台打包进 APK。App 启动后进入 `/workspace/`，不显示官网首页；创作数据通过 HTTPS 连接云端 API。
 - iOS App：使用同一套 Capacitor App 工作区和云端 API。iOS 构建需要 macOS/Xcode；签名安装包需要 Apple 开发者账号、证书和 provisioning profile。当前尚未配置签名发布流水线。
 
+## 必需的 API 地址配置
+
+Android APK 和 Cloudflare Pages 都是静态前端构建，API 地址会在构建时写入前端资源。不能使用 `127.0.0.1`、`localhost` 或 `*.invalid` 作为手机安装包的后端地址。
+
+- GitHub：进入 Settings → Secrets and variables → Actions → Variables，新增仓库变量 `NEXT_PUBLIC_API_BASE_URL`，值填写真实部署的 HTTPS API 域名根地址。不要带 `/api/v1` 路径、查询参数或尾部斜杠。
+- Cloudflare Pages：进入项目 `ai-comic-mobile` 的 Settings → Environment variables，为 Production 和 Preview 环境分别配置同名变量，然后重新部署。
+- API 服务必须已部署并可通过 `https://你的真实-api-域名/health` 访问。不要把 API 密钥放进 `NEXT_PUBLIC_*` 变量。
+
+Android 工作流会在编译前检查该变量；未配置、不是 HTTPS 或仍为本机/占位地址时会直接失败，不再生成无法连接服务器的 APK。
+
 ## Android APK
 
-仓库提供 GitHub Actions 工作流：Android Debug APK。正式运行前：
+仓库提供 GitHub Actions 工作流：Android Debug APK。
 
-1. 在 GitHub 仓库 Settings → Secrets and variables → Actions → Variables 中设置 NEXT_PUBLIC_API_BASE_URL，值必须是部署后的 HTTPS API 地址。
-2. 合并代码到 main。
-3. 打开 Actions → Android Debug APK → Run workflow。
-4. 构建成功后，在该次 workflow run 的 Artifacts 下载 ai-comic-mobile-android-debug。
-5. 这是 debug APK，仅用于内部安装验证；正式发布需要 Android release keystore、签名配置、版本号管理和真实设备验收。
+1. 先按上面的说明配置真实的 `NEXT_PUBLIC_API_BASE_URL`。
+2. 合并代码到 `main`，或在 GitHub Actions 中打开 Android Debug APK 工作流运行。
+3. 构建成功后，在该次 workflow run 的 Artifacts 下载 `ai-comic-mobile-android-debug`。
+4. 这是 debug APK，仅用于内部安装验证；正式发布需要 Android release keystore、签名配置、版本号管理和真实设备验收。
 
-本地 Windows 开发机可在 apps/web 目录执行：
+本地 Windows 开发机可在 `apps/web` 目录执行：
 
 ```powershell
 npm install
-$env:NEXT_PUBLIC_API_BASE_URL = "https://你的API域名"
+$env:NEXT_PUBLIC_API_BASE_URL = "https://你的真实-api-域名"
 npm run build
 npx cap add android
 npx cap sync android
@@ -35,7 +44,7 @@ Android Studio 中选择 Build → Generate Signed Bundle / APK 生成签名发�
 
 ```bash
 npm install
-export NEXT_PUBLIC_API_BASE_URL="https://你的API域名"
+export NEXT_PUBLIC_API_BASE_URL="https://你的真实-api-域名"
 npm run build
 npx cap add ios
 npx cap sync ios
