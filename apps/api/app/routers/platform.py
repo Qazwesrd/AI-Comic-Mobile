@@ -17,7 +17,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import (
     Chapter, DeviceActivation, License, Notice, OneTimeToken, Order, PaymentEvent,
-    Product, Project, PublishJob, Release, User, UserSession, utc_now,
+    Product, Project, PublishJob, Release, User, UserSession, Novel, utc_now,
 )
 from ..security import hash_password
 from ..security_services import (
@@ -109,7 +109,8 @@ def request_email_verification(
 
 
 @router.post("/auth/email/verify/confirm")
-def confirm_email(payload: TokenIn, db: Session = Depends(get_db)):
+def confirm_email(payload: TokenIn, request: Request, db: Session = Depends(get_db)):
+    enforce_rate_limit(db, f"email-confirm:{request_fingerprint(request)}", settings.rate_limit_auth_per_minute, 60)
     user = consume_one_time_token(db, payload.token, "verify_email")
     if user is None:
         raise HTTPException(status_code=400, detail="验证链接无效或已过期")
@@ -136,7 +137,8 @@ def forgot_password(payload: EmailIn, request: Request, db: Session = Depends(ge
 
 
 @router.post("/auth/password/reset")
-def reset_password(payload: PasswordResetIn, db: Session = Depends(get_db)):
+def reset_password(payload: PasswordResetIn, request: Request, db: Session = Depends(get_db)):
+    enforce_rate_limit(db, f"password-reset:{request_fingerprint(request)}", settings.rate_limit_auth_per_minute, 60)
     user = consume_one_time_token(db, payload.token, "password_reset")
     if user is None:
         raise HTTPException(status_code=400, detail="重置链接无效或已过期")
@@ -279,7 +281,9 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
 def admin_create_product(payload: ProductIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     if db.scalar(select(Product).where(Product.code == payload.code)):
         raise HTTPException(status_code=409, detail="商品编码已存在")
-    item = Product(**payload.model_dump(), currency=payload.currency.upper())
+    values = payload.model_dump()
+    values["currency"] = payload.currency.upper()
+    item = Product(**values)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -337,9 +341,7 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(get_cur
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if project is None:
         raise HTTPException(status_code=404, detail="项目不存在")
-    novel = __import__("app.models", fromlist=["Novel"]).Novel(
-        project_id=project.id, title=payload.title, source_text=payload.text, analysis_status="pending"
-    )
+    novel = Novel(project_id=project.id, title=payload.title, source_text=payload.text, analysis_status="pending")
     db.add(novel)
     db.flush()
     import re
