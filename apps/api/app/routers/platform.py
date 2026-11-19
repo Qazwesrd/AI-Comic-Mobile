@@ -408,9 +408,10 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require
 
 @router.post("/projects/{project_id}/novels/{novel_id}/analyze")
 async def analyze_novel(
-    project_id: int, novel_id: int, limit: int = 10, offset: int = 0,
+    project_id: int, novel_id: int, request: Request, limit: int = 10, offset: int = 0,
     user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
+    enforce_rate_limit(db, f"ai-analysis:{user.id}:{request_fingerprint(request)}", 5, 3600)
     if limit < 1 or limit > 20 or offset < 0:
         raise HTTPException(status_code=422, detail="每次最多解析20章")
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
@@ -474,8 +475,9 @@ def _license_expired(started_at: datetime) -> bool:
 
 async def _generate_artifact(
     artifact_type: str, project_id: int, novel_id: int, payload: ArtifactRequest,
-    user: User, db: Session,
+    request: Request, user: User, db: Session,
 ):
+    enforce_rate_limit(db, f"ai-generation:{user.id}:{request_fingerprint(request)}", 20, 3600)
     if not user.license or (not user.license.permanent and (not user.license.trial_started_at or _license_expired(user.license.trial_started_at))):
         raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
@@ -503,18 +505,18 @@ async def _generate_artifact(
 
 @router.post("/projects/{project_id}/novels/{novel_id}/script")
 async def generate_script(
-    project_id: int, novel_id: int, payload: ArtifactRequest,
+    project_id: int, novel_id: int, payload: ArtifactRequest, request: Request,
     user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
-    return await _generate_artifact("script", project_id, novel_id, payload, user, db)
+    return await _generate_artifact("script", project_id, novel_id, payload, request, user, db)
 
 
 @router.post("/projects/{project_id}/novels/{novel_id}/storyboard")
 async def generate_storyboard(
-    project_id: int, novel_id: int, payload: ArtifactRequest,
+    project_id: int, novel_id: int, payload: ArtifactRequest, request: Request,
     user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
-    return await _generate_artifact("storyboard", project_id, novel_id, payload, user, db)
+    return await _generate_artifact("storyboard", project_id, novel_id, payload, request, user, db)
 
 
 @router.get("/projects/{project_id}/novels/{novel_id}/artifacts")
