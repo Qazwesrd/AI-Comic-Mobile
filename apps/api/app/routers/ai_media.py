@@ -13,6 +13,7 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..media_generators import generate_image, generate_speech
+from ..ai_service import chat_json
 from ..models import MediaAsset, Novel, Project, StoryEntity
 from ..security_services import audit, enforce_rate_limit, request_fingerprint
 from .platform import require_active_license
@@ -23,6 +24,11 @@ router = APIRouter(prefix="/api/v1", tags=["ai-media"])
 class GenerateEntityImageIn(BaseModel):
     style: Literal["realistic", "3d_anime", "2d_anime", "guofeng", "ink"] = "3d_anime"
     extra_prompt: str = Field(default="", max_length=1000)
+
+
+class SubtitleIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    project_id: int | None = None
 
 
 class SpeechIn(BaseModel):
@@ -98,6 +104,60 @@ async def generate_story_entity_image(
     return {"entity_id": entity.id, "asset_id": asset.id, "asset_type": asset.asset_type,
             "file_name": asset.file_name, "mime_type": asset.mime_type,
             "size_bytes": asset.size_bytes, "approved": asset.approved}
+
+
+def _srt_time(seconds: float) -> str:
+    milliseconds = max(0, int(round(seconds * 1000)))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    whole_seconds, millis = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{whole_seconds:02d},{millis:03d}"
+
+
+@router.post("/audio/subtitles")
+async def create_subtitle_asset(
+    payload: SubtitleIn, request: Request,
+    user=Depends(require_active_license), db: Session = Depends(get_db),
+):
+    enforce_rate_limit(db, f"subtitle-generation:{user.id}:{request_fingerprint(request)}", 20, 3600)
+    if payload.project_id is not None:
+        project = db.scalar(select(Project).where(Project.id == payload.project_id, Project.user_id == user.id))
+        if project is None:
+            raise HTTPException(status_code=404, detail="项目不存在")
+    result = await chat_json(
+        "你是专业字幕编辑。把输入文本切分为便于手机观看的中文字幕片段，按语义断句，单条尽量不超过20个汉字。只返回JSON，格式为 {segments:[{start_seconds:number,end_seconds:number,text:string}]}。时间从0开始，顺序递增，片段之间不要重叠，语速按自然中文口播估算。",
+        payload.text,
+    )
+    segments = result.get("segments")
+    if not isinstance(segments, list) or not segments or len(segments) > 500:
+        raise HTTPException(status_code=502, detail="AI字幕服务没有返回有效片段")
+    normalized = []
+    previous_end = 0.0
+    for segment in segments:
+        try:
+            start = float(segment["start_seconds"])
+            end = float(segment["end_seconds"])
+            text = str(segment["text"]).strip()
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(status_code=502, detail="AI字幕时间格式无效")
+        if not text or start < previous_end or end <= start or end > 3600:
+            raise HTTPException(status_code=502, detail="AI字幕时间顺序或区间无效")
+        normalized.append((start, end, text))
+        previous_end = end
+    srt = "\n\n".join(
+        f"{index}\n{_srt_time(start)} --> {_srt_time(end)}\n{text}"
+        for index, (start, end, text) in enumerate(normalized, start=1)
+    ) + "\n"
+    file_name = f"subtitles-{uuid4().hex[:12]}.srt"
+    asset = _save_media(
+        user.id, "subtitle", "AI字幕-" + file_name, file_name,
+        "application/x-subrip", srt.encode("utf-8"), payload.project_id, db,
+    )
+    db.commit()
+    db.refresh(asset)
+    audit(db, "subtitle_asset_generated", "media_asset", str(asset.id), user.id)
+    return {"asset_id": asset.id, "file_name": asset.file_name,
+            "segments": len(normalized), "size_bytes": asset.size_bytes}
 
 
 @router.post("/audio/speech")
