@@ -37,6 +37,13 @@ ANDROID_APPS = [
         "handoff": "copy_prompt_and_manual_import",
     },
     {
+        "id": "capcut", "name": "CapCut", "category": "video-editing",
+        "package_name": "com.lemon.lvoverseas",
+        "store_url": "https://play.google.com/store/apps/details?id=com.lemon.lvoverseas",
+        "tasks": ["AI 辅助剪辑", "多轨时间线", "自动字幕", "配音与音频处理", "视频导出"],
+        "handoff": "copy_prompt_and_manual_import",
+    },
+    {
         "id": "jimeng", "name": "即梦 AI", "category": "image-video",
         "package_name": "com.bytedance.dreamina",
         "store_url": "https://app.mi.com/details?id=com.bytedance.dreamina",
