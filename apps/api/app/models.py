@@ -41,6 +41,7 @@ class DeviceActivation(Base):
     __table_args__ = (UniqueConstraint("user_id", "device_id", name="uq_user_device"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user: Mapped[User] = relationship(back_populates="devices")
     device_id: Mapped[str] = mapped_column(String(128), nullable=False)
     platform: Mapped[str] = mapped_column(String(24), default="unknown", nullable=False)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
