@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hmac
+import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -11,9 +12,9 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import DeviceActivation, License, User, UserSession, utc_now
-from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, LicenseOut, UserOut
+from ..schemas import AuthOut, CsrfOut, CredentialsIn, DeviceActivationIn, EmailCodeIn, LicenseOut, UserOut
 from ..security import create_session_token, decode_session_token, hash_csrf_token, hash_password, verify_password
-from ..security_services import create_one_time_token, enforce_rate_limit, request_fingerprint, send_account_email
+from ..security_services import create_one_time_code, consume_one_time_code, enforce_rate_limit, request_fingerprint, send_account_email
 
 router = APIRouter(prefix="/api/v1", tags=["accounts"])
 
@@ -54,34 +55,102 @@ def _issue_session(user: User, db: Session, response: Response) -> AuthOut:
     return AuthOut(user=UserOut.model_validate(user), csrf_token=csrf_token)
 
 
-@router.post("/auth/register", response_model=AuthOut, status_code=status.HTTP_201_CREATED)
-def register(payload: CredentialsIn, request: Request, response: Response, db: Session = Depends(get_db)) -> AuthOut:
-    enforce_rate_limit(db, f"register:{request_fingerprint(request)}", settings.rate_limit_auth_per_minute, 60)
-    existing = db.scalar(select(User).where(User.email == payload.email))
-    if existing:
-        raise HTTPException(status_code=409, detail="该邮箱已注册")
-    bootstrap_admins = {item.strip().lower() for item in settings.admin_bootstrap_emails.split(",") if item.strip()}
-    user = User(
-        email=payload.email, password_hash=hash_password(payload.password),
-        is_admin=payload.email in bootstrap_admins,
+def _send_registration_code(user: User, request: Request, db: Session) -> dict[str, str]:
+    email_key = hashlib.sha256(user.email.encode("utf-8")).hexdigest()
+    enforce_rate_limit(
+        db, f"register-email:{email_key}", settings.rate_limit_email_per_hour, 3600
     )
-    db.add(user)
+    enforce_rate_limit(
+        db, f"register-email-ip:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    code = create_one_time_code(db, user, "register_email_code", 10)
     try:
-        db.flush()
-        db.add(License(user_id=user.id))
-        db.commit()
-        db.refresh(user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="该邮箱已注册")
-    if settings.require_email_verification:
-        raw_token = create_one_time_token(db, user, "verify_email", 30)
         send_account_email(
-            user.email, "AI 漫剧手机版邮箱验证",
-            f"请在30分钟内打开以下链接完成邮箱验证：{settings.app_base_url}/verify-email?token={raw_token}",
+            user.email,
+            "AI 漫剧手机版注册验证码",
+            f"你的注册验证码是：{code}\\n\\n验证码10分钟内有效，请勿向任何人透露。",
         )
-    return _issue_session(user, db, response)
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="验证码邮件发送失败。账号信息已暂存，请检查邮件服务配置后重新发送。",
+        ) from None
+    return {"message": "验证码已发送，请查收邮箱（也请检查垃圾邮件文件夹）。验证码10分钟内有效。"}
 
+
+@router.post("/auth/register", status_code=status.HTTP_202_ACCEPTED)
+def register(payload: CredentialsIn, request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
+    enforce_rate_limit(
+        db, f"register:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is not None:
+        if user.email_verified:
+            raise HTTPException(status_code=409, detail="该邮箱已注册，请直接登录")
+        if not verify_password(payload.password, user.password_hash):
+            raise HTTPException(
+                status_code=409,
+                detail="该邮箱已有待验证账号，请使用注册时设置的密码重新发送验证码",
+            )
+    else:
+        bootstrap_admins = {
+            item.strip().lower()
+            for item in settings.admin_bootstrap_emails.split(",")
+            if item.strip()
+        }
+        user = User(
+            email=payload.email,
+            password_hash=hash_password(payload.password),
+            is_admin=payload.email in bootstrap_admins,
+        )
+        db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="该邮箱已注册") from None
+    return _send_registration_code(user, request, db)
+
+
+@router.post("/auth/register/resend-code", status_code=status.HTTP_202_ACCEPTED)
+def resend_registration_code(
+    payload: CredentialsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="邮箱或密码不正确")
+    if user.email_verified:
+        raise HTTPException(status_code=409, detail="该邮箱已经验证，请直接登录")
+    return _send_registration_code(user, request, db)
+
+
+@router.post("/auth/register/verify", response_model=AuthOut)
+def verify_registration_code(
+    payload: EmailCodeIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> AuthOut:
+    enforce_rate_limit(
+        db, f"register-verify:{request_fingerprint(request)}",
+        settings.rate_limit_auth_per_minute, 60
+    )
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is None or user.email_verified:
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+    if not consume_one_time_code(db, user, payload.code, "register_email_code"):
+        raise HTTPException(status_code=400, detail="验证码错误或已过期，请重新获取")
+    user.email_verified = True
+    if db.scalar(select(License).where(License.user_id == user.id)) is None:
+        db.add(License(user_id=user.id))
+    db.commit()
+    db.refresh(user)
+    return _issue_session(user, db, response)
 
 @router.post("/auth/login", response_model=AuthOut)
 def login(payload: CredentialsIn, request: Request, response: Response, db: Session = Depends(get_db)) -> AuthOut:
@@ -95,6 +164,8 @@ def login(payload: CredentialsIn, request: Request, response: Response, db: Sess
         db.commit()
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已停用")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="邮箱尚未验证，请在注册页面获取并填写邮箱验证码")
     return _issue_session(user, db, response)
 
 
