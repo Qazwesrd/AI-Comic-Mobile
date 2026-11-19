@@ -53,7 +53,7 @@ export default function HomePage() {
       </section>
 
       <section className="portal-card"><h2>简单透明的授权方式</h2><p>首次激活可免费体验 48 小时。试用结束后，支付人民币 30 元即可获得账号永久授权。第三方 AI 服务/API 费用由对应服务商收取，不包含在软件授权内。</p><a className="primary-action" href="/store">查看购买方式 ↗</a></section>
-      <nav className="portal-nav"><a href="/projects">创作项目</a><a href="/assets">素材交接中心</a><a href="/render">分镜合成</a><a href="/ai-tools">AI工具中心</a><a href="/video-editing">AI视频剪辑</a><a href="/audio">AI配音</a><a href="/publishing">视频发布</a><a href="/store">购买授权</a><a href="/orders">订单查询</a><a href="/notices">维护公告</a><a href="/downloads">版本下载</a><a href="/admin">管理后台</a></nav>
+      <nav className="portal-nav"><a href="/features">功能介绍</a><a href="/guide">使用教程</a><a href="/faq">常见问题</a><a href="/privacy">隐私政策</a><a href="/terms">用户协议</a><a href="/projects">创作项目</a><a href="/assets">素材交接中心</a><a href="/render">分镜合成</a><a href="/ai-tools">AI工具中心</a><a href="/video-editing">AI视频剪辑</a><a href="/audio">AI配音</a><a href="/publishing">视频发布</a><a href="/store">购买授权</a><a href="/orders">订单查询</a><a href="/notices">维护公告</a><a href="/downloads">版本下载</a><a href="/admin">管理后台</a></nav>
       <footer className="footer">
         <span>AI COMIC MOBILE</span>
         <span>独立项目 · 赛博朋克创作体验</span>
