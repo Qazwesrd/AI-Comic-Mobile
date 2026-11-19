@@ -89,6 +89,10 @@ def login(payload: CredentialsIn, request: Request, response: Response, db: Sess
     user = db.scalar(select(User).where(User.email == payload.email))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
+    bootstrap_admins = {item.strip().lower() for item in settings.admin_bootstrap_emails.split(",") if item.strip()}
+    if user.email in bootstrap_admins and not user.is_admin:
+        user.is_admin = True
+        db.commit()
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已停用")
     if settings.require_email_verification and not user.email_verified:
