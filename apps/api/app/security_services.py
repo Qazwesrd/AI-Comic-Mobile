@@ -7,7 +7,7 @@ import base64
 import hmac
 import secrets
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.orm import Session
@@ -40,11 +40,10 @@ def create_one_time_token(db: Session, user: User, purpose: str, minutes: int = 
 
 def create_one_time_code(db: Session, user: User, purpose: str, minutes: int = 10) -> str:
     code = f"{secrets.randbelow(1_000_000):06d}"
-    db.execute(update(OneTimeToken).where(
+    db.execute(delete(OneTimeToken).where(
         OneTimeToken.user_id == user.id,
         OneTimeToken.purpose == purpose,
-        OneTimeToken.used_at.is_(None),
-    ).values(used_at=utc_now()))
+    ))
     db.add(OneTimeToken(
         user_id=user.id,
         purpose=purpose,
