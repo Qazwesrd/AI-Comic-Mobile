@@ -40,3 +40,4 @@
 ## 当前状态
 
 项目已具备 Android Debug APK 自动构建流程，功能仍在持续开发和真机验收中。Debug APK 仅用于测试，不是正式签名发行版；iOS 原生版本暂缓。网站和支付尚未完成正式生产部署。
+<!-- Trigger Cloudflare Pages rebuild -->
