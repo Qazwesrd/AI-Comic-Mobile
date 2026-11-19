@@ -47,6 +47,8 @@ def create_render(
     user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     enforce_rate_limit(db, f"render:{user.id}:{request_fingerprint(request)}", 10, 3600)
+    if sum(shot.duration_seconds for shot in payload.shots) > 600:
+        raise HTTPException(status_code=422, detail="单个合成视频总时长不能超过10分钟")
     if not shutil.which("ffmpeg"):
         raise HTTPException(status_code=503, detail="当前服务器未安装 FFmpeg，暂时不能执行分镜静帧合成")
     if payload.project_id is not None:
