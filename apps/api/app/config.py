@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
-    app_secret_key: str = "development-only-change-me"
+    app_secret_key: str = "development-only-change-me-please-use-32-bytes"
     database_url: str = "sqlite:///./ai_comic_mobile.db"
     access_token_minutes: int = 60 * 24
     trial_hours: int = 72
