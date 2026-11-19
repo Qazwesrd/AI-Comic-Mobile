@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import NativeAppRedirect from "./NativeAppRedirect";
+import NativeAppChrome from "./NativeAppChrome";
 
 export const metadata: Metadata = {
   title: "AI 漫剧大师官方网站",
@@ -20,7 +21,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body><NativeAppRedirect />{children}</body>
+      <body><NativeAppRedirect /><NativeAppChrome />{children}</body>
     </html>
   );
 }
