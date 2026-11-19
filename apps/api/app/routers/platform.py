@@ -133,7 +133,7 @@ class PublishIn(BaseModel):
 
 @router.post("/auth/email/verify/request")
 def request_email_verification(
-    request: Request, user: User = Depends(require_active_license), db: Session = Depends(get_db)
+    request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"verify-email:{request_fingerprint(request)}", settings.rate_limit_email_per_hour, 3600)
     if user.email_verified:
