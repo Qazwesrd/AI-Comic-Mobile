@@ -201,3 +201,17 @@ class CreativeArtifact(Base):
     title: Mapped[str] = mapped_column(String(180), nullable=False)
     content_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class StoryEntity(Base):
+    __tablename__ = "story_entities"
+    __table_args__ = (UniqueConstraint("novel_id", "entity_type", "canonical_name", name="uq_novel_story_entity"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_uuid: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), index=True, nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    canonical_name: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    attributes_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
