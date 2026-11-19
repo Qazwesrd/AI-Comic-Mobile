@@ -58,10 +58,14 @@ ANDROID_APPS = [
 
 
 @router.get("")
-def list_ai_tool_modes(user=Depends(get_current_user)):
-    text_ready = bool(settings.ai_api_base_url and settings.ai_api_key and settings.ai_model)
-    image_ready = bool(settings.image_api_base_url and settings.image_api_key and settings.image_model)
-    audio_ready = bool(settings.audio_api_base_url and settings.audio_api_key and settings.audio_model)
+def list_ai_tool_modes(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    configured = {
+        row.capability: row.enabled
+        for row in db.scalars(select(AIProviderConfig).where(AIProviderConfig.user_id == user.id)).all()
+    }
+    text_ready = configured.get("text", bool(settings.ai_api_base_url and settings.ai_api_key and settings.ai_model))
+    image_ready = configured.get("image", bool(settings.image_api_base_url and settings.image_api_key and settings.image_model))
+    audio_ready = configured.get("audio", bool(settings.audio_api_base_url and settings.audio_api_key and settings.audio_model))
     return {
         "modes": [
             {
