@@ -3,8 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AppLauncher } from "@capacitor/app-launcher";
+import { apiUrl, getApiBaseUrl, setApiBaseUrl } from "../../lib/api-base";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 type Device = { device_id: string; platform: string; first_seen_at: string; last_seen_at: string };
 
@@ -38,10 +38,40 @@ export default function AccountPage() {
   const [license, setLicense] = useState<License | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);\n  const [apiBase, setApiBase] = useState("");\n  const [apiStatus, setApiStatus] = useState("尚未检测");\n  const [apiBusy, setApiBusy] = useState(false);
+
+  function saveApiServer() {
+    try {
+      const saved = setApiBaseUrl(apiBase);
+      setApiBase(saved);
+      setApiStatus("地址已保存，正在重新加载应用…");
+      window.setTimeout(() => window.location.reload(), 350);
+    } catch (error) {
+      setApiStatus(error instanceof Error ? error.message : "保存服务器地址失败");
+    }
+  }
+
+  async function testApiServer() {
+    setApiBusy(true);
+    setApiStatus("正在连接服务器…");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    try {
+      const base = setApiBaseUrl(apiBase);
+      setApiBase(base);
+      const response = await fetch(base + "/api/health", { signal: controller.signal, cache: "no-store" });
+      if (!response.ok) throw new Error(`服务器已响应，但健康检查返回 HTTP ${response.status}`);
+      setApiStatus("连接成功：服务器健康检查通过");
+    } catch (error) {
+      setApiStatus(error instanceof Error ? error.name === "AbortError" ? "连接超时，请检查地址、网络和服务器状态" : error.message : "连接失败");
+    } finally {
+      window.clearTimeout(timeout);
+      setApiBusy(false);
+    }
+  }
 
   async function loadDevices() {
-    const response = await fetch(`${API}/api/v1/devices`, { credentials: "include" });
+    const response = await fetch(apiUrl("/api/v1/devices"), { credentials: "include" });
     if (response.ok) setDevices(await response.json() as Device[]);
   }
 
@@ -50,7 +80,7 @@ export default function AccountPage() {
     localStorage.setItem("ai-comic-device-id", deviceId);
     const platform = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "ios" :
       /Android/i.test(navigator.userAgent) ? "android" : "web";
-    const response = await fetch(`${API}/api/v1/license/activate`, {
+    const response = await fetch(apiUrl("/api/v1/license/activate"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
@@ -62,12 +92,12 @@ export default function AccountPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsNativeApp(Capacitor.isNativePlatform());
+    setIsNativeApp(Capacitor.isNativePlatform());\n    setApiBase(getApiBaseUrl());
     async function restoreSession() {
       try {
-        const me = await fetch(`${API}/api/v1/auth/me`, { credentials: "include" });
+        const me = await fetch(apiUrl("/api/v1/auth/me"), { credentials: "include" });
         if (!me.ok) return;
-        const csrfResponse = await fetch(`${API}/api/v1/auth/csrf`, { credentials: "include" });
+        const csrfResponse = await fetch(apiUrl("/api/v1/auth/csrf"), { credentials: "include" });
         if (!csrfResponse.ok) return;
         const data = await csrfResponse.json() as { csrf_token: string };
         if (cancelled) return;
@@ -99,7 +129,7 @@ export default function AccountPage() {
         : method === "phone"
           ? codeSent ? { phone, code: verificationCode, password } : { phone }
           : codeSent ? { email, code: verificationCode } : { email, password };
-      const response = await fetch(`${API}${endpoint}`, {
+      const response = await fetch(apiUrl(endpoint), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +164,7 @@ export default function AccountPage() {
 
   async function removeDevice(deviceId: string) {
     try {
-      const response = await fetch(`${API}/api/v1/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": csrfToken } });
+      const response = await fetch(apiUrl(`/api/v1/devices/${encodeURIComponent(deviceId)}`), { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": csrfToken } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "解除设备失败");
       setDevices(items => items.filter(item => item.device_id !== deviceId));
@@ -151,7 +181,7 @@ export default function AccountPage() {
         ? "/api/v1/auth/register/phone/send-code"
         : "/api/v1/auth/register/resend-code";
       const body = registerMethod === "phone" ? { phone } : { email, password };
-      const response = await fetch(`${API}${endpoint}`, {
+      const response = await fetch(apiUrl(endpoint), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
@@ -170,7 +200,7 @@ export default function AccountPage() {
 
   async function logout() {
     try {
-      const response = await fetch(`${API}/api/v1/auth/logout`, {
+      const response = await fetch(apiUrl("/api/v1/auth/logout"), {
         method: "POST",
         credentials: "include",
         headers: { "X-CSRF-Token": csrfToken }
@@ -203,7 +233,19 @@ export default function AccountPage() {
         <div className="account-card">
           <p className="eyebrow">IDENTITY & LICENSE</p>
           <h1>账号中心</h1>
-          <p>注册或登录账号，激活设备并查看免费试用状态。</p>
+          <p>注册或登录账号，激活设备并查看免费试用状态。</p>\n          <section style={{ margin: "18px 0", padding: "16px", border: "1px solid rgba(140,144,255,.22)", borderRadius: "14px", background: "rgba(12,15,38,.55)" }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: "17px" }}>服务器连接设置</h2>
+            <p style={{ margin: "0 0 10px", fontSize: "12px", lineHeight: 1.7, color: "#aeb3d5" }}>配置 App 连接的 API 根地址。正式使用请填写已部署的 HTTPS 地址；只需填写域名，不要添加 /api 路径。</p>
+            <label style={{ display: "block", fontSize: "12px" }}>API 根地址
+              <input type="url" inputMode="url" autoCapitalize="none" spellCheck={false} value={apiBase} onChange={event => setApiBase(event.target.value)} placeholder="https://你的服务器域名" style={{ display: "block", width: "100%", boxSizing: "border-box", marginTop: "7px", padding: "12px", borderRadius: "9px" }} />
+            </label>
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+              <button type="button" className="account-submit" disabled={apiBusy} onClick={() => void testApiServer()}>{apiBusy ? "检测中…" : "测试连接"}</button>
+              <button type="button" className="account-submit" disabled={apiBusy} onClick={saveApiServer}>保存并重载</button>
+            </div>
+            <p role="status" aria-live="polite" className="account-message">{apiStatus}</p>
+          </section>
+
           {!license && (
             <>
               <div className="account-tabs">
