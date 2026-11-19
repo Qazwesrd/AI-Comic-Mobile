@@ -23,7 +23,7 @@ def _text_provider(db: Session | None, user_id: int | None) -> tuple[str, str, s
                 raise HTTPException(status_code=503, detail="你配置的文本 AI 服务已关闭，请先到 AI 服务配置中心启用")
             return row.provider, row.base_url.rstrip("/"), decrypt_api_key(row.encrypted_api_key), row.model
     if not all([settings.ai_api_base_url, settings.ai_api_key, settings.ai_model]):
-        raise HTTPException(status_code=503, detail="请先在 AI 服务配置中心配置文本 AI，或由服务部署方配置默认文本 AI")
+        raise HTTPException(status_code=503, detail="请先在 AI 服务配置中心配置文本 AI，或由服务部署方配置默认文本 AI（AI_API_BASE_URL、AI_API_KEY、AI_MODEL）")
     return "默认服务", settings.ai_api_base_url.rstrip("/"), settings.ai_api_key, settings.ai_model
 
 
