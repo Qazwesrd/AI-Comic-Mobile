@@ -17,7 +17,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import (
     Chapter, CreativeArtifact, DeviceActivation, License, Notice, OneTimeToken, Order, PaymentEvent,
-    Product, Project, PublishJob, Release, User, UserSession, Novel, utc_now,
+    Product, Project, PublishJob, Release, User, UserSession, Novel, StoryEntity, utc_now,
 )
 from ..security import hash_password
 from ..ai_service import chat_json
@@ -92,6 +92,12 @@ class NovelIn(BaseModel):
 class ArtifactRequest(BaseModel):
     chapter_no: int = Field(ge=1)
     instructions: str = Field(default="", max_length=4000)
+
+
+class EntityReviewIn(BaseModel):
+    approved: bool | None = None
+    canonical_name: str | None = Field(default=None, min_length=1, max_length=180)
+    description: str | None = Field(default=None, max_length=4000)
 
 
 class PublishIn(BaseModel):
@@ -393,6 +399,7 @@ async def analyze_novel(
     if not chapters:
         raise HTTPException(status_code=404, detail="没有可解析的章节")
     results = []
+    entities_created = 0
     for chapter in chapters:
         if len(chapter.content) > 30000:
             raise HTTPException(status_code=413, detail=f"第{chapter.chapter_no}章超过单次AI解析长度限制，请先拆分章节")
@@ -401,11 +408,38 @@ async def analyze_novel(
             f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}",
         )
         chapter.analysis_json = json.dumps(result, ensure_ascii=False)
+        for field_name, entity_type in (("characters", "character"), ("scenes", "scene"), ("props", "prop")):
+            candidates = result.get(field_name, [])
+            if not isinstance(candidates, list):
+                continue
+            for candidate in candidates:
+                if isinstance(candidate, str):
+                    name, description, attributes = candidate.strip(), "", {}
+                elif isinstance(candidate, dict):
+                    name = str(candidate.get("name") or candidate.get("canonical_name") or candidate.get("title") or "").strip()
+                    description = str(candidate.get("description") or candidate.get("appearance") or "")
+                    attributes = candidate
+                else:
+                    continue
+                if not name:
+                    continue
+                existing = db.scalar(select(StoryEntity).where(
+                    StoryEntity.novel_id == novel.id,
+                    StoryEntity.entity_type == entity_type,
+                    StoryEntity.canonical_name == name,
+                ))
+                if existing is None:
+                    db.add(StoryEntity(
+                        entity_uuid=str(uuid4()), novel_id=novel.id, entity_type=entity_type,
+                        canonical_name=name, description=description[:4000],
+                        attributes_json=json.dumps(attributes, ensure_ascii=False),
+                    ))
+                    entities_created += 1
         results.append({"chapter_no": chapter.chapter_no, "analysis": result})
     total_chapters = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
     novel.analysis_status = "analyzed" if len(results) >= total_chapters else "partially_analyzed"
     db.commit()
-    return {"novel_id": novel.id, "processed_chapters": len(results), "results": results,
+    return {"novel_id": novel.id, "processed_chapters": len(results), "entities_created": entities_created, "results": results,
             "message": "章节解析已完成；请人工审核人物、场景、道具和关系识别结果"}
 
 
@@ -466,6 +500,38 @@ def list_artifacts(
     ).order_by(desc(CreativeArtifact.created_at))).all()
     return [{"id": a.id, "type": a.artifact_type, "title": a.title,
              "content": json.loads(a.content_json), "created_at": _safe_dt(a.created_at)} for a in rows]
+
+
+@router.get("/projects/{project_id}/novels/{novel_id}/entities")
+def list_story_entities(
+    project_id: int, novel_id: int,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    if project is None or novel is None:
+        raise HTTPException(status_code=404, detail="项目或小说不存在")
+    rows = db.scalars(select(StoryEntity).where(StoryEntity.novel_id == novel_id).order_by(StoryEntity.entity_type, StoryEntity.canonical_name)).all()
+    return [{"id": e.id, "entity_uuid": e.entity_uuid, "type": e.entity_type,
+             "name": e.canonical_name, "description": e.description,
+             "attributes": json.loads(e.attributes_json), "approved": e.approved} for e in rows]
+
+
+@router.patch("/projects/{project_id}/novels/{novel_id}/entities/{entity_id}")
+def review_story_entity(
+    project_id: int, novel_id: int, entity_id: int, payload: EntityReviewIn,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    entity = db.scalar(select(StoryEntity).where(StoryEntity.id == entity_id, StoryEntity.novel_id == novel_id))
+    if project is None or novel is None or entity is None:
+        raise HTTPException(status_code=404, detail="素材记录不存在")
+    changes = payload.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(entity, "canonical_name" if key == "canonical_name" else key, value)
+    db.commit()
+    return {"id": entity.id, "approved": entity.approved, "name": entity.canonical_name}
 
 
 @router.post("/publishing/jobs")
