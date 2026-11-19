@@ -12,8 +12,8 @@
 - [x] 注册登录 API 原型与服务端 72 小时试用计时
 - [x] 账号中心页面与试用状态展示原型
 - [x] CORS 按环境配置，生产环境默认不放行本地开发来源
-- [ ] 安全会话迁移：HttpOnly、Secure、SameSite Cookie
-- [ ] Cookie 会话的 CSRF token、Origin/Referer 校验与退出失效
+- [x] 恢复账号 API 模块并迁移到 HttpOnly、Secure（生产环境）、SameSite Cookie
+- [x] Cookie 会话的 CSRF token、Origin 校验与服务端退出失效（待自动化测试验收）
 - [ ] 邮箱验证、密码重置与一次性令牌安全存储
 - [ ] 登录/注册/密码重置限流与防暴力尝试
 - [ ] 数据库迁移、密钥管理、审计日志与自动化安全测试
