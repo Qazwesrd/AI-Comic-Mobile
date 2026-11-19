@@ -19,16 +19,18 @@ export default function AccountPage() {
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [license, setLicense] = useState<License | null>(null);
+  const [csrfToken, setCsrfToken] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function loadLicense(token: string) {
+  async function loadLicense(csrf: string) {
     const deviceId = localStorage.getItem("ai-comic-device-id") || crypto.randomUUID();
     localStorage.setItem("ai-comic-device-id", deviceId);
     const platform = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "ios" :
       /Android/i.test(navigator.userAgent) ? "android" : "web";
     const response = await fetch(`${API}/api/v1/license/activate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
       body: JSON.stringify({ device_id: deviceId, platform })
     });
     if (!response.ok) throw new Error("设备激活失败，请稍后重试");
@@ -36,8 +38,23 @@ export default function AccountPage() {
   }
 
   useEffect(() => {
-    const token = sessionStorage.getItem("ai-comic-access-token");
-    if (token) void loadLicense(token).catch(() => sessionStorage.removeItem("ai-comic-access-token"));
+    let cancelled = false;
+    async function restoreSession() {
+      try {
+        const me = await fetch(`${API}/api/v1/auth/me`, { credentials: "include" });
+        if (!me.ok) return;
+        const csrfResponse = await fetch(`${API}/api/v1/auth/csrf`, { credentials: "include" });
+        if (!csrfResponse.ok) return;
+        const data = await csrfResponse.json() as { csrf_token: string };
+        if (cancelled) return;
+        setCsrfToken(data.csrf_token);
+        await loadLicense(data.csrf_token);
+      } catch {
+        if (!cancelled) setMessage("暂时无法连接账号服务，请检查网络后重试。");
+      }
+    }
+    void restoreSession();
+    return () => { cancelled = true; };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -48,13 +65,16 @@ export default function AccountPage() {
     try {
       const response = await fetch(`${API}/api/v1/auth/${mode === "register" ? "register" : "login"}`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "操作失败，请检查输入");
-      sessionStorage.setItem("ai-comic-access-token", data.access_token);
-      await loadLicense(data.access_token);
+      const csrf = String(data.csrf_token || "");
+      if (!csrf) throw new Error("安全会话建立失败，请重试");
+      setCsrfToken(csrf);
+      await loadLicense(csrf);
       setSuccess(true);
       setMessage("登录成功，账号与试用状态已连接。");
       setPassword("");
@@ -65,11 +85,22 @@ export default function AccountPage() {
     }
   }
 
-  function logout() {
-    sessionStorage.removeItem("ai-comic-access-token");
-    setLicense(null);
-    setMessage("已退出当前设备登录。");
-    setSuccess(true);
+  async function logout() {
+    try {
+      const response = await fetch(`${API}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": csrfToken }
+      });
+      if (!response.ok) throw new Error("退出失败，请重试");
+      setLicense(null);
+      setCsrfToken("");
+      setMessage("已安全退出当前设备登录。");
+      setSuccess(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "退出失败，请重试");
+      setSuccess(false);
+    }
   }
 
   const hours = license ? Math.floor(license.remaining_seconds / 3600) : 0;
@@ -109,10 +140,10 @@ export default function AccountPage() {
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
               {license.status === "expired" && "请前往官网购买永久授权。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
-              <br /><button type="button" className="account-submit" onClick={logout}>退出登录</button>
+              <br /><button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
             </div>
           )}
-          <p className="account-message">提示：当前为开发联调界面，正式上线前会补充邮箱验证、找回密码和安全会话管理。</p>
+          <p className="account-message">登录凭据由 HttpOnly Cookie 保存；页面不会读取或保存访问令牌。</p>
         </div>
       </section>
     </main>
