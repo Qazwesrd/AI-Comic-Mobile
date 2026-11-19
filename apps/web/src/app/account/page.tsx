@@ -62,7 +62,7 @@ export default function AccountPage() {
     try {
       const base = setApiBaseUrl(apiBase);
       setApiBase(base);
-      const response = await fetch(base + "/api/health", { signal: controller.signal, cache: "no-store" });
+      const response = await fetch(base + "/health", { signal: controller.signal, cache: "no-store" });
       if (!response.ok) throw new Error(`服务器已响应，但健康检查返回 HTTP ${response.status}`);
       setApiStatus("连接成功：服务器健康检查通过");
     } catch (error) {
