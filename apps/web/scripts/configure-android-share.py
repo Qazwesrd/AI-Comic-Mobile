@@ -122,6 +122,32 @@ public class ShareReceiverPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void readChunk(PluginCall call) {
+        String path = call.getString("path");
+        Integer offset = call.getInt("offset");
+        Integer length = call.getInt("length");
+        if (path == null || offset == null || length == null || offset < 0 || length < 1 || length > 8 * 1024 * 1024) {
+            call.reject("Invalid shared-file chunk request");
+            return;
+        }
+        File file = new File(path);
+        try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
+            if (!file.isFile() || (long) offset + length > file.length()) {
+                call.reject("Shared-file chunk is outside the file");
+                return;
+            }
+            byte[] bytes = new byte[length];
+            input.seek(offset);
+            input.readFully(bytes);
+            JSObject result = new JSObject();
+            result.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Unable to read shared-file chunk" : error.getMessage(), error);
+        }
+    }
+
     private String queryName(Uri uri) {
         try (Cursor cursor = getContext().getContentResolver().query(
             uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
