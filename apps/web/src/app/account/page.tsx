@@ -76,17 +76,18 @@ export default function AccountPage() {
     setBusy(true);
     setMessage("");
     setSuccess(false);
+    const method = mode === "register" ? registerMethod : loginMethod;
     try {
       const endpoint = mode === "login"
-        ? "/api/v1/auth/login"
-        : codeSent
-          ? "/api/v1/auth/register/verify"
-          : "/api/v1/auth/register";
+        ? method === "phone" ? "/api/v1/auth/login/phone" : "/api/v1/auth/login"
+        : method === "phone"
+          ? codeSent ? "/api/v1/auth/register/phone/verify" : "/api/v1/auth/register/phone/send-code"
+          : codeSent ? "/api/v1/auth/register/verify" : "/api/v1/auth/register";
       const body = mode === "login"
-        ? { email, password }
-        : codeSent
-          ? { email, code: verificationCode }
-          : { email, password };
+        ? method === "phone" ? { phone, password } : { email, password }
+        : method === "phone"
+          ? codeSent ? { phone, code: verificationCode, password } : { phone }
+          : codeSent ? { email, code: verificationCode } : { email, password };
       const response = await fetch(`${API}${endpoint}`, {
         method: "POST",
         credentials: "include",
