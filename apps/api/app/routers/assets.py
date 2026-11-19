@@ -26,14 +26,15 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".m4v"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg"}
 TEXT_EXTENSIONS = {".srt", ".vtt"}
+PLAIN_TEXT_EXTENSIONS = {".txt", ".md", ".markdown", ".json", ".csv"}
 PDF_EXTENSIONS = {".pdf"}
-ASSET_TYPES = {"character", "scene", "prop", "image", "reference", "video", "audio", "subtitle"}
+ASSET_TYPES = {"character", "scene", "prop", "image", "reference", "video", "audio", "subtitle", "text"}
 
 
 class UploadInitIn(BaseModel):
     file_name: str = Field(min_length=1, max_length=255)
     mime_type: str = Field(default="application/octet-stream", max_length=128)
-    asset_type: str = Field(pattern="^(character|scene|prop|image|reference|video|audio|subtitle)$")
+    asset_type: str = Field(pattern="^(character|scene|prop|image|reference|video|audio|subtitle|text)$")
     size_bytes: int = Field(gt=0)
     project_id: int | None = None
     chunk_size: int = Field(default=8 * 1024 * 1024, ge=1024 * 1024, le=8 * 1024 * 1024)
@@ -71,6 +72,8 @@ def _allowed_extensions(asset_type: str) -> set[str]:
         return AUDIO_EXTENSIONS
     if asset_type == "subtitle":
         return TEXT_EXTENSIONS
+    if asset_type == "text":
+        return PLAIN_TEXT_EXTENSIONS
     return set()
 
 
@@ -105,6 +108,7 @@ def init_upload(
         "character": "image/", "scene": "image/", "prop": "image/", "image": "image/",
         "reference": ("image/", "application/pdf"), "video": "video/",
         "audio": "audio/", "subtitle": ("text/", "application/x-subrip"),
+        "text": ("text/", "application/json"),
     }[payload.asset_type]
     accepted = expected_prefix if isinstance(expected_prefix, tuple) else (expected_prefix,)
     if mime != "application/octet-stream" and not any(mime.startswith(prefix) if prefix.endswith("/") else mime == prefix for prefix in accepted):
