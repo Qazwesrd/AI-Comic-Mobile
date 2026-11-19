@@ -23,7 +23,7 @@ Android APK 不再要求在构建时写入固定 API 域名。安装后可以在
 
 地址保存在当前设备的 App WebView 本地存储中，不会作为密码或访问令牌发送给 GitHub。清除 App 数据或重新安装后需要重新填写。
 
-## GitHub Actions
+## 服务端跨域与登录会话\n\nAndroid Capacitor WebView 的来源为 `https://localhost`，iOS Capacitor WebView 的来源为 `capacitor://localhost`。FastAPI CORS 已精确允许这两个原生来源，不使用通配符。生产部署使用 `SESSION_COOKIE_SAMESITE=none` 和 HTTPS Secure Cookie，以便 App 跨站请求携带登录会话；Render 配置模板已设置该值。若自定义部署，请同步设置该环境变量，并确认反向代理使用 HTTPS。\n\n## GitHub Actions
 
 Android Debug APK 工作流现在允许 API 地址留空并继续构建。也可以在手动触发工作流时通过可选的 `api_base_url` 输入预置默认地址，或使用仓库变量 `NEXT_PUBLIC_API_BASE_URL`。如果均未提供，用户首次打开 App 后在账号中心设置即可。
 
