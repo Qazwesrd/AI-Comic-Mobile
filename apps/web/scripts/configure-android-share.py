@@ -144,9 +144,6 @@ public class ShareReceiverPlugin extends Plugin {
                 return;
             }
             try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
-                call.reject("Shared-file chunk is outside the file");
-                return;
-            }
                 byte[] bytes = new byte[length];
                 input.seek(offset);
                 input.readFully(bytes);
