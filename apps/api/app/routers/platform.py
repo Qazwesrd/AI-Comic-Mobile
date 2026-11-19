@@ -16,10 +16,11 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import (
-    Chapter, DeviceActivation, License, Notice, OneTimeToken, Order, PaymentEvent,
+    Chapter, CreativeArtifact, DeviceActivation, License, Notice, OneTimeToken, Order, PaymentEvent,
     Product, Project, PublishJob, Release, User, UserSession, Novel, utc_now,
 )
 from ..security import hash_password
+from ..ai_service import chat_json
 from ..security_services import (
     audit, consume_one_time_token, create_one_time_token, enforce_rate_limit,
     request_fingerprint, send_account_email,
@@ -82,6 +83,11 @@ class ProjectIn(BaseModel):
 class NovelIn(BaseModel):
     title: str = Field(min_length=1, max_length=180)
     text: str = Field(min_length=1, max_length=5_000_000)
+
+
+class ArtifactRequest(BaseModel):
+    chapter_no: int = Field(ge=1)
+    instructions: str = Field(default="", max_length=4000)
 
 
 class PublishIn(BaseModel):
@@ -363,6 +369,95 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(get_cur
     chapter_count = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
     return {"novel_id": novel.id, "chapter_count": chapter_count, "analysis_status": "pending",
             "message": "小说已导入并拆分章节；AI 深度解析需要配置模型服务后执行"}
+
+
+@router.post("/projects/{project_id}/novels/{novel_id}/analyze")
+async def analyze_novel(
+    project_id: int, novel_id: int, limit: int = 10,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    if limit < 1 or limit > 20:
+        raise HTTPException(status_code=422, detail="每次最多解析20章")
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    if project is None or novel is None:
+        raise HTTPException(status_code=404, detail="项目或小说不存在")
+    chapters = db.scalars(select(Chapter).where(Chapter.novel_id == novel.id).order_by(Chapter.chapter_no).limit(limit)).all()
+    if not chapters:
+        raise HTTPException(status_code=404, detail="没有可解析的章节")
+    results = []
+    for chapter in chapters:
+        if len(chapter.content) > 30000:
+            raise HTTPException(status_code=413, detail=f"第{chapter.chapter_no}章超过单次AI解析长度限制，请先拆分章节")
+        result = await chat_json(
+            "你是专业漫剧编剧与故事分析师。只返回JSON，字段包括 summary、characters、scenes、props、events、relationships、timeline、continuity_notes。保留原作主线，不编造原文没有的重要事实。",
+            f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}",
+        )
+        chapter.analysis_json = json.dumps(result, ensure_ascii=False)
+        results.append({"chapter_no": chapter.chapter_no, "analysis": result})
+    novel.analysis_status = "partially_analyzed" if len(chapters) == limit else "analyzed"
+    db.commit()
+    return {"novel_id": novel.id, "processed_chapters": len(results), "results": results,
+            "message": "章节解析已完成；请人工审核人物、场景、道具和关系识别结果"}
+
+
+async def _generate_artifact(
+    artifact_type: str, project_id: int, novel_id: int, payload: ArtifactRequest,
+    user: User, db: Session,
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    chapter = db.scalar(select(Chapter).where(Chapter.novel_id == novel_id, Chapter.chapter_no == payload.chapter_no))
+    if project is None or novel is None or chapter is None:
+        raise HTTPException(status_code=404, detail="项目、小说或章节不存在")
+    if len(chapter.content) > 30000:
+        raise HTTPException(status_code=413, detail="章节超过单次生成长度限制，请先拆分章节")
+    if artifact_type == "script":
+        system = "你是专业漫剧编剧。根据原文改编成可拍摄的漫剧剧本，保留主线、人物动机和关键事件。只返回JSON，包含 title、logline、scenes 数组，每场包含 location、time、characters、action、dialogue、emotion。"
+    else:
+        system = "你是专业分镜导演。将剧本/小说章节拆解为可执行分镜。只返回JSON，包含 aspect_ratio、shots 数组，每镜包含 shot_no、duration_seconds、shot_size、camera_move、visual_prompt、dialogue、sound、transition。"
+    result = await chat_json(system, f"小说：{novel.title}\n章节：{chapter.title}\n正文：\n{chapter.content}\n用户补充要求：{payload.instructions}")
+    item = CreativeArtifact(
+        project_id=project.id, novel_id=novel.id, artifact_type=artifact_type,
+        title=f"{chapter.title or '章节'+str(chapter.chapter_no)}-{artifact_type}",
+        content_json=json.dumps(result, ensure_ascii=False),
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "artifact_type": item.artifact_type, "content": result}
+
+
+@router.post("/projects/{project_id}/novels/{novel_id}/script")
+async def generate_script(
+    project_id: int, novel_id: int, payload: ArtifactRequest,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    return await _generate_artifact("script", project_id, novel_id, payload, user, db)
+
+
+@router.post("/projects/{project_id}/novels/{novel_id}/storyboard")
+async def generate_storyboard(
+    project_id: int, novel_id: int, payload: ArtifactRequest,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    return await _generate_artifact("storyboard", project_id, novel_id, payload, user, db)
+
+
+@router.get("/projects/{project_id}/novels/{novel_id}/artifacts")
+def list_artifacts(
+    project_id: int, novel_id: int,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    if project is None or novel is None:
+        raise HTTPException(status_code=404, detail="项目或小说不存在")
+    rows = db.scalars(select(CreativeArtifact).where(
+        CreativeArtifact.project_id == project_id, CreativeArtifact.novel_id == novel_id
+    ).order_by(desc(CreativeArtifact.created_at))).all()
+    return [{"id": a.id, "type": a.artifact_type, "title": a.title,
+             "content": json.loads(a.content_json), "created_at": _safe_dt(a.created_at)} for a in rows]
 
 
 @router.post("/publishing/jobs")
