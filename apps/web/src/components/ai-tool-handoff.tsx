@@ -50,12 +50,10 @@ export default function AIToolHandoff({ projectTitle, aspectRatio, instruction, 
 
   const selected = useMemo(() => tools.find(tool => tool.id === selectedId) || tools[0], [tools, selectedId]);
   const prompt = useMemo(() => {
-    const frameLines = keyframes.map(frame => `源素材 #${frame.source_id} 的关键帧：素材 #${frame.asset_id}，时间点 ${(frame.timestamp_ms / 1000).toFixed(1)} 秒（请用户从素材库下载并上传此图片）。`).join("
-");
+    const frameLines = keyframes.map(frame => `源素材 #${frame.source_id} 的关键帧：素材 #${frame.asset_id}，时间点 ${(frame.timestamp_ms / 1000).toFixed(1)} 秒（请用户从素材库下载并上传此图片）。`).join("\n");
     const sourceLines = sources.map((source, index) =>
       `${index + 1}. 素材编号 ${source.id}：${source.file_name}；时长：${source.duration_ms === null ? "尚未探测" : (source.duration_ms / 1000).toFixed(2) + "秒"}；媒体探测：${source.probe_status}`
-    ).join("
-");
+    ).join("\n");
     return [
       "你是专业短视频剪辑导演和时间线规划师，请根据以下资料帮助我完成视频剪辑。",
       `项目：${projectTitle}`,
@@ -71,8 +69,7 @@ export default function AIToolHandoff({ projectTitle, aspectRatio, instruction, 
       "时间码必须在已知素材时长范围内；无法确定时标记为待人工确认。",
       "如果你能直接剪辑视频，请说明支持的输入格式、输出格式和限制；不要声称已经导出文件，除非实际提供了文件。",
       "请用简体中文回答，保持原视频核心内容，不要覆盖原始素材。"
-    ].join("
-");
+    ].join("\n");
   }, [projectTitle, aspectRatio, instruction, sources, keyframes]);
 
   async function copyPrompt() {
