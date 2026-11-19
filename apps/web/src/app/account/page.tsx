@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { AppLauncher } from "@capacitor/app-launcher";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -14,7 +16,7 @@ type License = {
   message: string;
 };
 
-export default function AccountPage() {
+export default function AccountPage() {\n  async function openOfficialPayment() {\n    const url = "https://ai-comic-mobile.pages.dev/store/";\n    if (Capacitor.isNativePlatform()) await AppLauncher.openUrl({ url });\n    else window.location.href = url;\n  }
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -188,7 +190,7 @@ export default function AccountPage() {
         <span className="system-pill"><i /> 账号中心</span>
       </header>
       <section className="account-wrap">
-        <a className="account-back" href="/">← 返回创作首页</a>
+        <a className="account-back" href={Capacitor.isNativePlatform() ? "/workspace/" : "/"}>← 返回{Capacitor.isNativePlatform() ? "软件工作台" : "官网首页"}</a>
         <div className="account-card">
           <p className="eyebrow">IDENTITY & LICENSE</p>
           <h1>账号中心</h1>
@@ -225,13 +227,13 @@ export default function AccountPage() {
               <strong>{license.message}</strong><br />
               <h3>已绑定设备（最多3台）</h3>{devices.map(device => <div className="portal-card" key={device.device_id}><strong>{device.platform}</strong><small>{device.device_id}</small><button type="button" className="account-submit" onClick={() => void removeDevice(device.device_id)}>解除此设备</button></div>)}<br />
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
-              {license.status === "expired" && "请前往官网购买永久授权。"}
+              {license.status === "expired" && "48小时试用已结束。请前往官方网站完成付款，付款核实后即可恢复软件全部功能。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
-              <br /><button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
+              <br />{license.status === "expired" && <button type="button" className="account-submit" onClick={() => void openOfficialPayment()}>前往官网付款</button>}<button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
             </div>
           )}
           <p className="account-message">登录凭据由 HttpOnly Cookie 保存；页面不会读取或保存访问令牌。</p>
-          <a className="account-back" href="/store">购买永久授权</a>　<a className="account-back" href="/orders">订单查询</a>
+          
         </div>
       </section>
     </main>
