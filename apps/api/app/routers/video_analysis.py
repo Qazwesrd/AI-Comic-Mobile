@@ -172,10 +172,17 @@ def export_video(
             segment_labels.append(f"[{gap_label}]")
             gap_index += 1
         inputs.extend(["-ss", f"{start_ms / 1000:.3f}", "-t", f"{(end_ms - start_ms) / 1000:.3f}", "-i", str(path)])
+        duration_seconds = (end_ms - start_ms) / 1000
+        fade_duration = min(0.35, duration_seconds / 2) if clip.get("transition") == "fade" else 0
+        fade_filters = (
+            f",fade=t=in:st=0:d={fade_duration:.3f},"
+            f"fade=t=out:st={max(0, duration_seconds - fade_duration):.3f}:d={fade_duration:.3f}"
+            if fade_duration else ""
+        )
         filters.append(
             f"[{index}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={payload.fps},"
-            f"format=yuv420p,setpts=PTS-STARTPTS[v{index}]"
+            f"format=yuv420p,setpts=PTS-STARTPTS{fade_filters}[v{index}]"
         )
         segment_labels.append(f"[v{index}]")
         cursor_ms = position_ms + end_ms - start_ms
