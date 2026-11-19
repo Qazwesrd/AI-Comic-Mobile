@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Literal
 from uuid import uuid4
 
@@ -88,10 +89,19 @@ async def generate_story_entity_image(
         view_instruction = "电影级场景概念设计图，清晰空间布局、光照和环境细节，宽画幅构图，不要文字和水印。"
     else:
         view_instruction = "道具三视图设定图，同一物品正面、侧面、背面并列展示，结构和材质一致，干净中性背景，不要文字和水印。"
+    try:
+        attributes = json.loads(entity.attributes_json or "{}")
+    except (TypeError, ValueError):
+        attributes = {}
+    continuity = json.dumps(attributes, ensure_ascii=False)[:5000]
     prompt = (
         f"风格：{style}。素材名称：{entity.canonical_name}。"
-        f"原文描述：{entity.description}。补充要求：{payload.extra_prompt}。"
-        f"{view_instruction}高质量专业动画/影视前期美术设定。"
+        f"原文描述：{entity.description}。原文识别出的外观与设定属性：{continuity}。"
+        f"补充要求：{payload.extra_prompt}。"
+        f"{view_instruction}"
+        "严格遵守原文已知设定，不擅自改变角色性别、年龄观感、发型、服装主色、标志性配饰或道具结构；"
+        "未提供的信息采用合理且克制的设计，不要添加与原文冲突的细节。"
+        "高质量专业动画/影视前期美术设定。"
     )
     content, mime, extension = await generate_image(prompt, db=db, user_id=user.id)
     file_name = f"{entity.canonical_name}-reference{extension}"
