@@ -129,7 +129,7 @@ export default function AssetsPage() {
     <header className="topbar"><a className="brand" href="/">AI 漫剧手机版</a><span className="system-pill">安卓素材交接中心</span></header>
     <section className="account-wrap" style={{width:"min(900px,100%)"}}><div className="account-card">
       <p className="eyebrow">ANDROID MEDIA HANDOFF</p><h1>素材交接中心</h1>
-      <p>从手机上已安装的 AI 应用保存生成结果，再一次选择多个文件导入。系统会按扩展名和 MIME 类型预判素材类别，你可以在上传前修改，并关联到漫剧项目或独立剪辑项目。</p>
+      <p>从手机上已安装的 AI 应用保存生成结果，再一次选择多个文件导入。系统会按扩展名和 MIME 类型预判素材类别，你可以在上传前修改，并关联到漫剧项目；独立视频剪辑项目可先将素材导入素材库，再在剪辑工作台中选择。</p>
       <div className="account-form">
         <label>关联项目（可选）<select value={projectId} onChange={e=>setProjectId(e.target.value)}>
           <option value="">暂不关联项目</option>{projects.map(project=><option key={project.id} value={project.id}>{project.title}</option>)}
