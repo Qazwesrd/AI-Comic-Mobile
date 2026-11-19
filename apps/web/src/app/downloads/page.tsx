@@ -24,9 +24,10 @@ export default function DownloadsPage() {
         const license = await licenseResponse.json() as { status: Gate };
         if (license.status !== "permanent") {
           if (!cancelled) {
-            setGate(license.status === "trial" || license.status === "expired" || license.status === "not_activated" ? license.status : "error");
-            setMessage(license.status === "trial" ? "试用期间暂不开放正式版下载。试用结束后，请在官网完成付款。" :
-              license.status === "expired" ? "48小时试用已结束。完成永久授权付款并经核实后，正式版下载链接才会显示。" :
+            const status = license.status === "trial" || license.status === "expired" || license.status === "not_activated" ? license.status : "error";
+            setGate(status);
+            setMessage(status === "trial" ? "试用期间暂不开放正式版下载。试用结束后，请在官网完成付款。" :
+              status === "expired" ? "48小时试用已结束。完成永久授权付款并经核实后，正式版下载链接才会显示。" :
               "账号尚未完成设备激活或永久授权。请先完成账号激活或付款。");
           }
           return;
@@ -54,20 +55,22 @@ export default function DownloadsPage() {
         <p className="eyebrow">AUTHORIZED DOWNLOADS</p><h1>正式版下载</h1>
         <p>正式版下载链接只会在服务器确认账号已获得永久授权后显示。试用期间或未付款账号不会显示下载地址。</p>
         <p className="account-message">{message}</p>
-        {#if gate === "login"}
+        {gate === "login" ? (
           <a className="primary-action" href="/account/">登录官网账号 ↗</a>
-        {:else if gate === "trial" || gate === "expired" || gate === "not_activated"}
-          <a className="primary-action" href="/store/">前往官网付款与授权 ↗</a>
-          <a className="account-back" href="/account/">账号中心 / 激活设备</a>
-        {:else if gate === "permanent"}
-          {items.map((release) => (
+        ) : gate === "trial" || gate === "expired" || gate === "not_activated" ? (
+          <>
+            <a className="primary-action" href="/store/">前往官网付款与授权 ↗</a>
+            <a className="account-back" href="/account/">账号中心 / 激活设备</a>
+          </>
+        ) : gate === "permanent" ? (
+          items.map((release) => (
             <article className="portal-card" key={release.release_id}>
               <strong>{release.platform.toUpperCase()} · {release.version}</strong>
               <p>{release.notes}</p><small>最低支持版本：{release.minimum_supported_version}</small>
               <a className="primary-action" href={`${API}/api/v1/releases/${release.release_id}/download`} rel="noopener noreferrer">下载正式版 ↗</a>
             </article>
-          ))}
-        {/if}
+          ))
+        ) : null}
         <a className="account-back" href="/">返回官网首页</a>
       </div></section>
     </main>
