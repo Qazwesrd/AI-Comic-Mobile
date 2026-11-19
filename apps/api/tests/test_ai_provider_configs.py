@@ -21,7 +21,7 @@ def override_get_db():
 
 
 def setup_module():
-    import app.ai_config_models  # noqa: F401
+    from app import ai_config_models as _ai_config_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
     app.dependency_overrides[get_db] = override_get_db
 
