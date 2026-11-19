@@ -69,7 +69,7 @@ def _send_registration_code(user: User, request: Request, db: Session) -> dict[s
         send_account_email(
             user.email,
             "AI 漫剧手机版注册验证码",
-            f"你的注册验证码是：{code}\\n\\n验证码10分钟内有效，请勿向任何人透露。",
+            f"你的注册验证码是：{code}\n\n验证码10分钟内有效，请勿向任何人透露。",
         )
     except RuntimeError as exc:
         raise HTTPException(
