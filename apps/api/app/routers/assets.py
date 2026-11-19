@@ -100,7 +100,22 @@ def init_upload(
     extension = Path(file_name).suffix.lower()
     if extension not in _allowed_extensions(payload.asset_type):
         raise HTTPException(status_code=415, detail="文件格式与素材类型不匹配或暂不支持")
+    mime = payload.mime_type.lower().split(";", 1)[0].strip()
+    expected_prefix = {
+        "character": "image/", "scene": "image/", "prop": "image/", "image": "image/",
+        "reference": ("image/", "application/pdf"), "video": "video/",
+        "audio": "audio/", "subtitle": ("text/", "application/x-subrip"),
+    }[payload.asset_type]
+    accepted = expected_prefix if isinstance(expected_prefix, tuple) else (expected_prefix,)
+    if mime != "application/octet-stream" and not any(mime.startswith(prefix) if prefix.endswith("/") else mime == prefix for prefix in accepted):
+        raise HTTPException(status_code=415, detail="文件 MIME 类型与素材类型不匹配")
     _owned_project(db, payload.project_id, user.id)
+    active_uploads = db.query(UploadSession).filter(
+        UploadSession.user_id == user.id, UploadSession.status == "uploading",
+        UploadSession.expires_at > utc_now(),
+    ).count()
+    if active_uploads >= 5:
+        raise HTTPException(status_code=429, detail="同时进行的上传任务最多5个")
 
     upload_id = str(uuid4())
     total_chunks = (payload.size_bytes + payload.chunk_size - 1) // payload.chunk_size
@@ -124,9 +139,10 @@ def init_upload(
 async def upload_chunk(
     upload_id: str, chunk_index: int, request: Request,
     x_chunk_sha256: str = Header(default=""),
-    user=Depends(get_current_user), db: Session = Depends(get_db),
+    user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     session = _get_upload(db, upload_id, user.id)
+    enforce_rate_limit(db, f"upload-chunk:{user.id}:{upload_id}", session.total_chunks * 3, 3600)
     if chunk_index < 0 or chunk_index >= session.total_chunks:
         raise HTTPException(status_code=404, detail="分片序号无效")
     body = await request.body()
@@ -151,7 +167,7 @@ async def upload_chunk(
 
 @router.post("/uploads/{upload_id}/complete")
 def complete_upload(
-    upload_id: str, user=Depends(get_current_user), db: Session = Depends(get_db),
+    upload_id: str, user=Depends(require_active_license), db: Session = Depends(get_db),
 ):
     session = _get_upload(db, upload_id, user.id)
     received = set(json.loads(session.received_chunks_json))
