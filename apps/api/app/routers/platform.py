@@ -73,6 +73,11 @@ class OrderCreateIn(BaseModel):
     product_code: str = Field(min_length=2, max_length=48)
 
 
+class ManualPaymentConfirmIn(BaseModel):
+    transaction_id: str = Field(min_length=4, max_length=128)
+    note: str = Field(default="", max_length=500)
+
+
 class ProductIn(BaseModel):
     code: str = Field(min_length=2, max_length=48)
     name: str = Field(min_length=2, max_length=120)
@@ -280,6 +285,39 @@ async def payment_webhook(request: Request, x_payment_signature: str = Header(de
     db.commit()
     audit(db, "payment_verified", "order", order.order_no, order.user_id)
     return {"received": True, "authorized": bool(product.grants_permanent_license)}
+
+
+@router.post("/admin/orders/{order_no}/confirm-paid")
+def admin_confirm_manual_payment(
+    order_no: str, payload: ManualPaymentConfirmIn,
+    admin: User = Depends(require_admin), db: Session = Depends(get_db),
+):
+    order = db.scalar(select(Order).where(Order.order_no == order_no))
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.status == "paid":
+        raise HTTPException(status_code=409, detail="该订单已经核验并授权，不能重复确认")
+    if order.status != "pending":
+        raise HTTPException(status_code=409, detail="订单状态不允许核验")
+    if order.amount_minor != 3000 or order.currency != "CNY":
+        raise HTTPException(status_code=409, detail="订单金额不符合30元永久授权规则")
+    product = db.get(Product, order.product_id)
+    if product is None or not product.grants_permanent_license:
+        raise HTTPException(status_code=409, detail="订单商品不是永久授权商品")
+    order.status = "paid"
+    order.provider = "manual_verified"
+    order.provider_transaction_id = payload.transaction_id.strip()
+    order.paid_at = utc_now()
+    license_record = db.scalar(select(License).where(License.user_id == order.user_id))
+    if license_record is None:
+        license_record = License(user_id=order.user_id)
+        db.add(license_record)
+    license_record.permanent = True
+    license_record.permanent_granted_at = utc_now()
+    license_record.source_order_id = order.order_no
+    db.commit()
+    audit(db, "manual_payment_verified", "order", order.order_no, admin.id)
+    return {"order_no": order.order_no, "status": "paid", "permanent_license_granted": True}
 
 
 @router.get("/devices")
