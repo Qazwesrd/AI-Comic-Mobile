@@ -21,6 +21,7 @@ from ..models import (
     Product, Project, PublishJob, Release, User, UserSession, Novel, StoryEntity, utc_now,
 )
 from ..security import hash_password
+from ..licensing import trial_is_expired
 from ..ai_service import chat_json
 from ..security_services import (
     audit, consume_one_time_token, create_one_time_token, enforce_rate_limit,
@@ -46,10 +47,7 @@ def require_active_license(user: User = Depends(get_current_user), db: Session =
         return user
     if not record.trial_started_at:
         raise HTTPException(status_code=402, detail="请先激活设备开始48小时试用")
-    started = record.trial_started_at
-    if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) >= started + timedelta(hours=48):
+    if trial_is_expired(record.trial_started_at):
         raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     return user
 
@@ -565,9 +563,7 @@ async def analyze_novel(
 
 
 def _license_expired(started_at: datetime) -> bool:
-    if started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) >= started_at + timedelta(hours=settings.trial_hours)
+    return trial_is_expired(started_at)
 
 
 async def _generate_artifact(
