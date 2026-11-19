@@ -16,7 +16,10 @@ type License = {
 
 export default function AccountPage() {
   const [mode, setMode] = useState<"login" | "register">("register");
-  const [email, setEmail] = useState("");\n  const [phone, setPhone] = useState("");\n  const [registerMethod, setRegisterMethod] = useState<"email" | "phone">("email");\n  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [registerMethod, setRegisterMethod] = useState<"email" | "phone">("email");
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
