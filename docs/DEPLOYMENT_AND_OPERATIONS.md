@@ -72,3 +72,5 @@
 - AUDIO_API_BASE_URL、AUDIO_API_KEY、AUDIO_MODEL：需要兼容 OpenAI Audio Speech 格式的语音服务。服务端会请求 /audio/speech 并保存 MP3。
 - 图片生成支持人物三视图参考图、场景概念图和道具三视图；生成结果先进入私有素材库，用户仍需人工审核。
 - 不同厂商对图片/语音 API 的兼容程度不同；配置前应以对应厂商文档确认 endpoint、模型名、尺寸、语音和返回格式。未配置时 API 明确返回 503，不会假装生成成功。
+
+- 字幕生成使用 AI_API_BASE_URL / AI_API_KEY / AI_MODEL，返回 SRT 文件并保存到素材库；字幕时间轴为模型估算，需要人工校对。
