@@ -89,3 +89,16 @@ def test_visual_generation_requires_provider_configuration(monkeypatch):
         )
         assert response.status_code == 503
         assert "IMAGE_API_BASE_URL" in response.json()["detail"]
+
+
+def test_subtitle_generation_requires_text_provider(monkeypatch):
+    monkeypatch.setattr(settings, "ai_api_base_url", "")
+    monkeypatch.setattr(settings, "ai_api_key", "")
+    monkeypatch.setattr(settings, "ai_model", "")
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        headers = register_and_activate(client, "subtitle-user@example.com", "subtitle-device-0001")
+        response = client.post("/api/v1/audio/subtitles", headers=headers, json={
+            "text": "第一句旁白。第二句旁白。"
+        })
+        assert response.status_code == 503
+        assert "AI_API_BASE_URL" in response.json()["detail"]
