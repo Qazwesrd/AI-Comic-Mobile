@@ -29,7 +29,7 @@ def teardown_module():
     Base.metadata.drop_all(bind=engine)
 
 
-def test_ai_tools_endpoint_reports_modes_without_exposing_secrets(monkeypatch):
+def test_ai_tools_endpoint_reports_android_clients_without_exposing_secrets(monkeypatch):
     monkeypatch.setattr(settings, "ai_api_base_url", "https://example.invalid/v1")
     monkeypatch.setattr(settings, "ai_api_key", "do-not-return-this-secret")
     monkeypatch.setattr(settings, "ai_model", "test-model")
@@ -44,10 +44,16 @@ def test_ai_tools_endpoint_reports_modes_without_exposing_secrets(monkeypatch):
         payload = response.json()
         modes = {item["id"]: item for item in payload["modes"]}
         assert modes["built-in"]["capabilities"]["text"] is True
-        assert modes["web"]["capabilities"]["video_editing"] is True
-        assert any(tool["id"] == "runway" for tool in payload["web_tools"])
+        assert modes["android-client"]["capabilities"]["video_editing"] is True
+        clients = {item["id"]: item for item in payload["android_apps"]}
+        assert clients["chatgpt"]["package_name"] == "com.openai.chatgpt"
+        assert clients["deepseek"]["package_name"] == "com.deepseek.chat"
+        assert clients["claude"]["package_name"] == "com.anthropic.claude"
+        assert clients["doubao"]["package_name"] == "com.larus.nova"
+        assert clients["jimeng"]["package_name"] == "com.bytedance.dreamina"
+        assert "web_tools" not in payload
         assert "do-not-return-this-secret" not in response.text
-        assert all(tool["url"].startswith("https://") for tool in payload["web_tools"])
+        assert all(item["store_url"].startswith("https://") for item in payload["android_apps"])
 
 
 def test_ai_tools_endpoint_requires_login():
