@@ -53,7 +53,7 @@
 - [ ] 剪映/CapCut、可灵、Runway 等客户端逐一核实包名与官方启动能力后再接入
 - [ ] 账号级 AI 服务商自助配置、密钥加密保存和密钥不回显
 - [ ] 模型连通性测试、供应商预设、费用确认与调用日志
-- [x] Android 系统分享接收首版代码：ACTION_SEND / ACTION_SEND_MULTIPLE、私有缓存暂存、Capacitor 桥接与 8 MiB 分块读取（待 APK 构建及真机验收）
+- [x] Android 系统分享接收首版：ACTION_SEND / ACTION_SEND_MULTIPLE、私有缓存暂存、Capacitor 桥接与 8 MiB 分块读取（Debug APK 自动构建成功；待真机验收）
 - [ ] 根据图片/视频内容识别人物、场景、道具和分镜并给出自动关联建议
 - [ ] 从独立剪辑项目中选择素材并建立来源关联
 
