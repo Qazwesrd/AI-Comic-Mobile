@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
+import { consumeAndroidSharedFiles } from "../../lib/android-share-receiver";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const CHUNK_SIZE = 8 * 1024 * 1024;
@@ -46,7 +47,24 @@ export default function AssetsPage() {
       if(projectResponse.ok)setProjects(await projectResponse.json());
     } catch { setMessage("无法读取素材库，请检查登录和网络"); }
   }
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    void load();
+    const receiveSharedFiles = async () => {
+      try {
+        const files = await consumeAndroidSharedFiles();
+        if (files.length) {
+          setQueue(rows => [...rows, ...files.map(file => ({ file, assetType: guessType(file) }))]);
+          setMessage("已从 Android 系统分享接收 " + files.length + " 个文件，请确认分类和项目后导入。");
+        }
+      } catch {
+        // PWA/browser mode or no pending Android share: keep the normal file-picker workflow.
+      }
+    };
+    const onNativeShare = () => { void receiveSharedFiles(); };
+    window.addEventListener("androidShareReceived", onNativeShare);
+    void receiveSharedFiles();
+    return () => window.removeEventListener("androidShareReceived", onNativeShare);
+  },[]);
 
   function chooseFiles(e:ChangeEvent<HTMLInputElement>) {
     const chosen=Array.from(e.target.files||[]);
