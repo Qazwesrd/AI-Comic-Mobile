@@ -89,6 +89,7 @@ def check_phone_verification_code(phone: str, code: str) -> bool:
                 phone_number=phone,
                 verify_code=code,
                 case_auth_policy=0,
+                scheme_name=settings.aliyun_sms_scheme_name or None,
             ),
             util_models.RuntimeOptions(),
         )
