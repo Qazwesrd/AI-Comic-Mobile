@@ -45,11 +45,11 @@ def require_active_license(user: User = Depends(get_current_user), db: Session =
     if record.permanent:
         return user
     if not record.trial_started_at:
-        raise HTTPException(status_code=402, detail="请先激活设备开始72小时试用")
+        raise HTTPException(status_code=402, detail="请先激活设备开始48小时试用")
     started = record.trial_started_at
     if started.tzinfo is None:
         started = started.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) >= started + timedelta(hours=settings.trial_hours):
+    if datetime.now(timezone.utc) >= started + timedelta(hours=48):
         raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     return user
 
