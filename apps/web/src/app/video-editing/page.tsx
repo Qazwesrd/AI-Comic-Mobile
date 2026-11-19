@@ -13,7 +13,10 @@ type Plan = { id:number; summary:string; limitations:string[]; clips:{source_id:
 
 export default function VideoEditingPage() {
   const [projects,setProjects]=useState<Project[]>([]);
-  const [assets,setAssets]=useState<Asset[]>([]);\n  const [audioAssets,setAudioAssets]=useState<Asset[]>([]);\n  const [musicAssetId,setMusicAssetId]=useState("");\n  const [exportAssetId,setExportAssetId]=useState<number|null>(null);
+  const [assets,setAssets]=useState<Asset[]>([]);
+  const [audioAssets,setAudioAssets]=useState<Asset[]>([]);
+  const [musicAssetId,setMusicAssetId]=useState("");
+  const [exportAssetId,setExportAssetId]=useState<number|null>(null);
   const [selected,setSelected]=useState<Project|null>(null);
   const [sources,setSources]=useState<Source[]>([]);
   const [title,setTitle]=useState("");
@@ -156,7 +159,9 @@ export default function VideoEditingPage() {
           </div>
           <h3>项目视频素材</h3>
           {sources.map(source=><article className="portal-card" key={source.id}><strong>{source.title}</strong><p>{source.file_name} · 媒体探测：{source.probe_status}{source.duration_ms?" · "+(source.duration_ms/1000).toFixed(1)+"秒":" · 时长尚未探测"}</p><button className="account-submit" onClick={()=>addClip(source.id)}>添加5秒片段到时间线</button><button className="account-submit" disabled={busy||!source.duration_ms} onClick={()=>void extractKeyframes(source.id)}>提取关键帧（每5秒）</button>{(keyframes[source.id]||[]).map(frame=><p key={frame.asset_id}>关键帧 {Math.round(frame.timestamp_ms/1000)}秒 · 素材 #{frame.asset_id} · <a href={API+"/api/v1/assets/"+frame.asset_id+"/download"} target="_blank" rel="noreferrer">查看图片</a></p>)}</article>)}
-          <h3>背景音乐</h3>\n          <div className="account-form"><label>选择背景音乐（可选）<select value={musicAssetId} onChange={e=>setMusicAssetId(e.target.value)}><option value="">不添加背景音乐</option>{audioAssets.map(a=><option key={a.id} value={a.id}>{a.title} · {a.file_name}</option>)}</select></label></div>\n          <h3>AI文字剪辑指令</h3>
+          <h3>背景音乐</h3>
+          <div className="account-form"><label>选择背景音乐（可选）<select value={musicAssetId} onChange={e=>setMusicAssetId(e.target.value)}><option value="">不添加背景音乐</option>{audioAssets.map(a=><option key={a.id} value={a.id}>{a.title} · {a.file_name}</option>)}</select></label></div>
+          <h3>AI文字剪辑指令</h3>
           <div className="account-form">
             <label>告诉AI你想怎样剪辑<textarea rows={4} value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="例如：保留节奏紧凑的部分，删除停顿，按时间顺序组合，输出竖屏短视频。"/></label>
             <button className="account-submit" disabled={busy||sources.length===0||instruction.trim().length<3} onClick={()=>void createPlan()}>{busy?"处理中…":"生成AI剪辑建议"}</button>
