@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 import hashlib
+import base64
 import hmac
 import secrets
 import smtplib
+import httpx
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
@@ -37,6 +39,51 @@ def create_one_time_token(db: Session, user: User, purpose: str, minutes: int = 
     return raw
 
 
+def create_one_time_code(db: Session, user: User, purpose: str, minutes: int = 10) -> str:
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    db.execute(update(OneTimeToken).where(
+        OneTimeToken.user_id == user.id,
+        OneTimeToken.purpose == purpose,
+        OneTimeToken.used_at.is_(None),
+    ).values(used_at=utc_now()))
+    db.add(OneTimeToken(
+        user_id=user.id,
+        purpose=purpose,
+        token_hash=token_digest(f"{user.id}:{purpose}:{code}"),
+        expires_at=utc_now() + timedelta(minutes=minutes),
+    ))
+    db.commit()
+    return code
+
+
+def consume_one_time_code(db: Session, user: User, code: str, purpose: str) -> bool:
+    if len(code) != 6 or not code.isdigit():
+        return False
+    digest = token_digest(f"{user.id}:{purpose}:{code}")
+    record = db.scalar(select(OneTimeToken).where(
+        OneTimeToken.user_id == user.id,
+        OneTimeToken.token_hash == digest,
+        OneTimeToken.purpose == purpose,
+        OneTimeToken.used_at.is_(None),
+    ))
+    if record is None:
+        return False
+    expires = record.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires <= utc_now():
+        return False
+    claimed = db.execute(update(OneTimeToken).where(
+        OneTimeToken.id == record.id,
+        OneTimeToken.used_at.is_(None),
+    ).values(used_at=utc_now()))
+    if claimed.rowcount != 1:
+        db.rollback()
+        return False
+    db.commit()
+    return True
+
+
 def consume_one_time_token(db: Session, raw: str, purpose: str) -> User | None:
     digest = token_digest(raw)
     record = db.scalar(select(OneTimeToken).where(
@@ -63,21 +110,48 @@ def consume_one_time_token(db: Session, raw: str, purpose: str) -> User | None:
 
 
 def send_account_email(recipient: str, subject: str, text_body: str) -> bool:
-    if not all([settings.smtp_host, settings.smtp_from_email]):
-        return False
+    required = [
+        settings.gmail_client_id,
+        settings.gmail_client_secret,
+        settings.gmail_refresh_token,
+        settings.gmail_sender_email,
+    ]
+    if not all(required):
+        raise RuntimeError("Gmail API email settings are incomplete.")
+
     message = EmailMessage()
-    message["From"] = settings.smtp_from_email
+    message["From"] = settings.gmail_sender_email
     message["To"] = recipient
     message["Subject"] = subject
     message.set_content(text_body)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
-        if settings.smtp_use_tls:
-            smtp.starttls()
-        if settings.smtp_username:
-            smtp.login(settings.smtp_username, settings.smtp_password)
-        smtp.send_message(message)
-    return True
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
 
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            token_response = client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": settings.gmail_client_id,
+                    "client_secret": settings.gmail_client_secret,
+                    "refresh_token": settings.gmail_refresh_token,
+                    "grant_type": "refresh_token",
+                },
+            )
+            token_response.raise_for_status()
+            access_token = token_response.json().get("access_token")
+            if not access_token:
+                raise RuntimeError("Gmail OAuth did not return an access token.")
+            send_response = client.post(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json={"raw": raw_message},
+            )
+            send_response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(f"Gmail API request failed with HTTP {exc.response.status_code}.") from None
+    except httpx.RequestError:
+        raise RuntimeError("Gmail API network request failed.") from None
+    return True
 
 def enforce_rate_limit(db: Session, key: str, limit: int, window_seconds: int) -> None:
     now = utc_now()
