@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
+from .platform import require_active_license
 from ..config import settings
 from ..database import get_db
 from ..ai_config_models import AIProviderConfig
@@ -64,7 +65,7 @@ ANDROID_APPS = [
 
 
 @router.get("")
-def list_ai_tool_modes(user=Depends(get_current_user), db: Session = Depends(get_db)):
+def list_ai_tool_modes(user=Depends(require_active_license), db: Session = Depends(get_db)):
     configured = {
         row.capability: row.enabled
         for row in db.scalars(select(AIProviderConfig).where(AIProviderConfig.user_id == user.id)).all()
