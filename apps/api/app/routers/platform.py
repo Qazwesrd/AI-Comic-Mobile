@@ -449,6 +449,7 @@ def list_project_novels(
         "title": novel.title,
         "analysis_status": novel.analysis_status,
         "chapter_count": db.query(Chapter).filter(Chapter.novel_id == novel.id).count(),
+        "analyzed_chapter_count": db.query(Chapter).filter(Chapter.novel_id == novel.id, Chapter.analysis_json.is_not(None)).count(),
     } for novel in novels]
 
 
