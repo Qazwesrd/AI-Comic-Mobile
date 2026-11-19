@@ -82,9 +82,9 @@ async def generate_image(prompt: str, *, db: Session | None = None, user_id: int
             raise HTTPException(status_code=502, detail="图片生成服务连接失败或返回格式不兼容")
         if not raw or len(raw) > 25 * 1024 * 1024:
             raise HTTPException(status_code=502, detail="生成图片为空或超过25MB")
-        if raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if raw.startswith(b"\x89PNG\r\n\x1a\n"):
             result_tuple = (raw, "image/png", ".png")
-        elif raw.startswith(b"\\xff\\xd8\\xff"):
+        elif raw.startswith(b"\xff\xd8\xff"):
             result_tuple = (raw, "image/jpeg", ".jpg")
         elif raw.startswith((b"GIF87a", b"GIF89a")):
             result_tuple = (raw, "image/gif", ".gif")
