@@ -158,7 +158,7 @@ export default function AssetsPage() {
         <label>从手机选择文件（支持多选）<input type="file" multiple accept="image/*,video/*,audio/*,.srt,.vtt,.txt,.md,.markdown,.json,.csv,.pdf" onChange={chooseFiles}/></label>
         <p>支持图片、视频、音频、SRT/VTT 字幕、TXT/Markdown/JSON/CSV 文本和 PDF。单文件最大2GB，采用8MB分片上传。</p>
       </div>
-      {queue.length>0&&<><h2>待导入文件（{queue.length}）</h2>{queue.map((row,index)=><article className="portal-card" key={row.file.name+row.file.lastModified+index}>
+      {queue.length>0&&<><h2>待导入文件（{queue.length}）</h2>{queue.map((row,index)=><article className="portal-card" key={row.file.name+("lastModified" in row.file?row.file.lastModified:row.file.path)+index}>
         <strong>{row.file.name}</strong><p>{(row.file.size/1024/1024).toFixed(2)} MB · 自动识别为：{typeLabels[row.assetType]}</p>
         <label>素材分类<select value={row.assetType} onChange={e=>changeQueuedType(index,e.target.value as AssetType)}>
           {Object.entries(typeLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}
