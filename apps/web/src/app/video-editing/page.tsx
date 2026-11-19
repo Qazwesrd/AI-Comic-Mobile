@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
+import AIToolHandoff from "../../components/ai-tool-handoff";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 type Project = { id:number; title:string; description:string; aspect_ratio:string; source_count:number; revision:number };
@@ -133,6 +134,7 @@ export default function VideoEditingPage() {
             <label>告诉AI你想怎样剪辑<textarea rows={4} value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="例如：保留节奏紧凑的部分，删除停顿，按时间顺序组合，输出竖屏短视频。"/></label>
             <button className="account-submit" disabled={busy||sources.length===0||instruction.trim().length<3} onClick={()=>void createPlan()}>{busy?"处理中…":"生成AI剪辑建议"}</button>
           </div>
+          <AIToolHandoff projectTitle={selected.title} aspectRatio={selected.aspect_ratio} instruction={instruction} sources={sources.map(source=>({id:source.id,file_name:source.file_name,duration_ms:source.duration_ms,probe_status:source.probe_status}))} />
           {plan&&<article className="portal-card"><strong>AI建议（草稿）</strong><p>{plan.summary}</p>{plan.limitations.map((x,i)=><p key={i}>注意：{x}</p>)}<p>建议片段：{plan.clips.length}</p><button className="account-submit" disabled={!plan.clips.length} onClick={applyPlan}>应用到时间线</button></article>}
           <h3>时间线 · 版本 {revision}</h3>
           <p>当前提供基础视频轨道片段编辑；高级多轨、波形、转场预览与正式渲染将在后续阶段继续完善。</p>
