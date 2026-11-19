@@ -86,10 +86,16 @@ source = main_activity.read_text(encoding="utf-8")
 if "AIAppLauncherPlugin.class" not in source:
     if "import android.os.Bundle;" not in source:
         source = source.replace("package " + app_id + ";", "package " + app_id + ";\n\nimport android.os.Bundle;")
-    marker = "public class MainActivity extends BridgeActivity {"
-    if marker not in source:
-        raise SystemExit("Unexpected MainActivity.java template")
-    source = source.replace(marker, marker + """
+    on_create = "public void onCreate(Bundle savedInstanceState) {"
+    if on_create in source:
+        source = source.replace(on_create, on_create + "\\n        registerPlugin(AIAppLauncherPlugin.class);", 1)
+    else:
+        marker = "public class MainActivity extends BridgeActivity {"
+        if marker not in source:
+            raise SystemExit("Unexpected MainActivity.java template")
+        if "import android.os.Bundle;" not in source:
+            source = source.replace("package " + app_id + ";", "package " + app_id + ";\\n\\nimport android.os.Bundle;")
+        source = source.replace(marker, marker + """
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AIAppLauncherPlugin.class);
