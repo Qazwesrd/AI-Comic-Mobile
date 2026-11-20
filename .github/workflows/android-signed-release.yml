@@ -160,8 +160,8 @@ jobs:
           if os.environ["RELEASE_CHANNEL"] == "test":
               import re
               xml, count = re.subn(
-                  r'(<string name="app_name">)(.*?)(</string>)',
-                  r'\\1\\2（测试版）\\3',
+                  r'<string name="app_name">(.*?)</string>',
+                  lambda match: '<string name="app_name">' + match.group(1) + '（测试版）</string>',
                   xml,
                   count=1,
               )
