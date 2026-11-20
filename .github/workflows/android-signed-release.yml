@@ -38,10 +38,10 @@ jobs:
       RELEASE_CHANNEL: ${{ inputs.release_channel }}
       VERSION_NAME: ${{ inputs.version_name }}
       VERSION_CODE: ${{ inputs.version_code }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,8 +64,11 @@ jobs:
               raise SystemExit("Missing GitHub Actions signing secrets: " + ", ".join(missing))
           if not re.fullmatch(r"[0-9]+", os.environ["VERSION_CODE"]) or int(os.environ["VERSION_CODE"]) < 1:
               raise SystemExit("version_code must be a positive integer")
-          if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?", os.environ["VERSION_NAME"]):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?", os.environ["VERSION_NAME"]):
               raise SystemExit("version_name must use semantic version format, e.g. 0.1.0")
+          api = os.environ.get("NEXT_PUBLIC_API_BASE_URL", "").strip()
+          if not api.startswith("https://") or api.endswith("/") or any(x in api.lower() for x in ("localhost", "127.0.0.1", ".invalid")):
+              raise SystemExit("NEXT_PUBLIC_API_BASE_URL must be a real HTTPS API root URL without a trailing slash")
           PY
       - name: Install web and Capacitor dependencies
         run: npm ci
