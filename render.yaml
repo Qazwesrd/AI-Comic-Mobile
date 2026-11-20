@@ -11,6 +11,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
       - key: APP_SECRET_KEY
         generateValue: true
       - key: TOKEN_PEPPER
@@ -33,6 +35,24 @@ services:
         sync: false
       - key: SMTP_USE_TLS
         value: "true"
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_SENDER_EMAIL
+        sync: false
+      - key: ALIBABA_CLOUD_ACCESS_KEY_ID
+        sync: false
+      - key: ALIBABA_CLOUD_ACCESS_KEY_SECRET
+        sync: false
+      - key: ALIYUN_SMS_SIGN_NAME
+        sync: false
+      - key: ALIYUN_SMS_TEMPLATE_CODE
+        sync: false
+      - key: ALIYUN_SMS_SCHEME_NAME
+        sync: false
       - key: ADMIN_BOOTSTRAP_EMAILS
         sync: false
       - key: WEB_ORIGIN

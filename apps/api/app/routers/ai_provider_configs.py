@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..ai_config_models import AIProviderConfig, AIProviderUsageLog
 from ..ai_config_security import decrypt_api_key, encrypt_api_key
 from ..auth import get_current_user
+from .platform import require_active_license
 from ..database import get_db
 from ..security_services import enforce_rate_limit
 
@@ -103,7 +104,7 @@ def delete_config(capability: str, user=Depends(get_current_user), db: Session =
 
 
 @router.post("/{capability}/test")
-async def test_config(capability: str, request: Request, user=Depends(get_current_user), db: Session = Depends(get_db)):
+async def test_config(capability: str, request: Request, user=Depends(require_active_license), db: Session = Depends(get_db)):
     if capability not in CAPABILITIES:
         raise HTTPException(status_code=404, detail="AI 能力类型不存在")
     enforce_rate_limit(db, f"ai-config-test:{user.id}", 10, 3600)

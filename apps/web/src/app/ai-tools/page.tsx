@@ -1,10 +1,12 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AppLauncher } from "@capacitor/app-launcher";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 type Tool = { id:string; name:string; category:string; package_name:string; store_url:string; tasks:string[]; handoff:string };
 type Data = { modes:{id:string;name:string;description:string;configured:boolean;configuration_note?:string;capabilities:Record<string,boolean>}[]; android_apps:Tool[]; workflow:string[]; limitations:string[] };
 

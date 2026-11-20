@@ -1,0 +1,38 @@
+# Android App 运行时服务器配置
+
+## 目的
+
+Android APK 不再要求在构建时写入固定 API 域名。安装后可以在 App 的「账号中心 → 服务器连接设置」填写服务器地址、测试连接并保存。保存后 App 会重新加载，主要创作页面、账号和授权状态统一使用这个地址。
+
+## 地址格式
+
+- 正式环境填写完整 HTTPS 根地址，例如 `https://api.your-domain.tld`。
+- 只填写域名根地址，不要附加 `/api`、用户名密码、查询参数或路径。
+- 非 HTTPS 仅允许 localhost 开发测试；正式 Android 连接应使用 HTTPS。
+- App 的健康检查请求为 `/health`；成功后显示连接成功。
+- 不需要在构建 APK 前向开发者提供域名。
+
+## 用户操作
+
+1. 打开 Android App，进入「账号」。
+2. 找到「服务器连接设置」。
+3. 输入 API 根地址。
+4. 点击「测试连接」，确认健康检查通过。
+5. 点击「保存并重载」。
+6. 返回工作台，重新登录并使用项目、素材、AI 工具、配音、剪辑和发布功能。
+
+地址保存在当前设备的 App WebView 本地存储中，不会作为密码或访问令牌发送给 GitHub。清除 App 数据或重新安装后需要重新填写。
+
+## 服务端跨域与登录会话
+
+Android Capacitor WebView 的来源为 `https://localhost`，iOS Capacitor WebView 的来源为 `capacitor://localhost`。FastAPI CORS 已精确允许这两个原生来源，不使用通配符。生产部署使用 `SESSION_COOKIE_SAMESITE=none` 和 HTTPS Secure Cookie，以便 App 跨站请求携带登录会话；Render 配置模板已设置该值。若自定义部署，请同步设置该环境变量，并确认反向代理使用 HTTPS。
+
+## GitHub Actions
+
+Android Debug APK 工作流现在允许 API 地址留空并继续构建。也可以在手动触发工作流时通过可选的 `api_base_url` 输入预置默认地址，或使用仓库变量 `NEXT_PUBLIC_API_BASE_URL`。如果均未提供，用户首次打开 App 后在账号中心设置即可。
+
+## 验收边界
+
+- 代码已提供运行时配置、地址校验、保存、健康检查和主要页面统一读取。
+- GitHub Actions 负责构建 Debug APK；构建是否成功以本次提交对应的 Actions 运行结果为准。
+- 真实服务器连通性、登录、Cookie/CSRF、上传下载和完整创作流程仍需部署 API 后进行真机验收。

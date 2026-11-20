@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { AppLauncher } from "@capacitor/app-launcher";
+import { apiUrl, getApiBaseUrl, setApiBaseUrl } from "../../lib/api-base";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 type Device = { device_id: string; platform: string; first_seen_at: string; last_seen_at: string };
 
@@ -15,18 +17,64 @@ type License = {
 };
 
 export default function AccountPage() {
+  async function openOfficialPayment() {
+    const url = "https://ai-comic-mobile.pages.dev/store/";
+    if (isNativeApp) {
+      try { await AppLauncher.openUrl({ url }); }
+      catch { window.open(url, "_blank", "noopener,noreferrer"); }
+    } else window.location.href = url;
+  }
+  const [isNativeApp, setIsNativeApp] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [registerMethod, setRegisterMethod] = useState<"email" | "phone">("email");
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [license, setLicense] = useState<License | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
   const [busy, setBusy] = useState(false);
+  const [apiBase, setApiBase] = useState("");
+  const [apiStatus, setApiStatus] = useState("尚未检测");
+  const [apiBusy, setApiBusy] = useState(false);
+
+  function saveApiServer() {
+    try {
+      const saved = setApiBaseUrl(apiBase);
+      setApiBase(saved);
+      setApiStatus("地址已保存，正在重新加载应用…");
+      window.setTimeout(() => window.location.reload(), 350);
+    } catch (error) {
+      setApiStatus(error instanceof Error ? error.message : "保存服务器地址失败");
+    }
+  }
+
+  async function testApiServer() {
+    setApiBusy(true);
+    setApiStatus("正在连接服务器…");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    try {
+      const base = setApiBaseUrl(apiBase);
+      setApiBase(base);
+      const response = await fetch(base + "/health", { signal: controller.signal, cache: "no-store" });
+      if (!response.ok) throw new Error(`服务器已响应，但健康检查返回 HTTP ${response.status}`);
+      setApiStatus("连接成功：服务器健康检查通过");
+    } catch (error) {
+      setApiStatus(error instanceof Error ? error.name === "AbortError" ? "连接超时，请检查地址、网络和服务器状态" : error.message : "连接失败");
+    } finally {
+      window.clearTimeout(timeout);
+      setApiBusy(false);
+    }
+  }
 
   async function loadDevices() {
-    const response = await fetch(`${API}/api/v1/devices`, { credentials: "include" });
+    const response = await fetch(apiUrl("/api/v1/devices"), { credentials: "include" });
     if (response.ok) setDevices(await response.json() as Device[]);
   }
 
@@ -35,7 +83,7 @@ export default function AccountPage() {
     localStorage.setItem("ai-comic-device-id", deviceId);
     const platform = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "ios" :
       /Android/i.test(navigator.userAgent) ? "android" : "web";
-    const response = await fetch(`${API}/api/v1/license/activate`, {
+    const response = await fetch(apiUrl("/api/v1/license/activate"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
@@ -47,11 +95,13 @@ export default function AccountPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setIsNativeApp(Capacitor.isNativePlatform());
+    setApiBase(getApiBaseUrl());
     async function restoreSession() {
       try {
-        const me = await fetch(`${API}/api/v1/auth/me`, { credentials: "include" });
+        const me = await fetch(apiUrl("/api/v1/auth/me"), { credentials: "include" });
         if (!me.ok) return;
-        const csrfResponse = await fetch(`${API}/api/v1/auth/csrf`, { credentials: "include" });
+        const csrfResponse = await fetch(apiUrl("/api/v1/auth/csrf"), { credentials: "include" });
         if (!csrfResponse.ok) return;
         const data = await csrfResponse.json() as { csrf_token: string };
         if (cancelled) return;
@@ -71,23 +121,44 @@ export default function AccountPage() {
     setBusy(true);
     setMessage("");
     setSuccess(false);
+    const method = mode === "register" ? registerMethod : loginMethod;
     try {
-      const response = await fetch(`${API}/api/v1/auth/${mode === "register" ? "register" : "login"}`, {
+      const endpoint = mode === "login"
+        ? method === "phone" ? "/api/v1/auth/login/phone" : "/api/v1/auth/login"
+        : method === "phone"
+          ? codeSent ? "/api/v1/auth/register/phone/verify" : "/api/v1/auth/register/phone/send-code"
+          : codeSent ? "/api/v1/auth/register/verify" : "/api/v1/auth/register";
+      const body = mode === "login"
+        ? method === "phone" ? { phone, password } : { email, password }
+        : method === "phone"
+          ? codeSent ? { phone, code: verificationCode, password } : { phone }
+          : codeSent ? { email, code: verificationCode } : { email, password };
+      const response = await fetch(apiUrl(endpoint), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
-      const data = await response.json();
+      const data = await response.json() as { detail?: string; message?: string; csrf_token?: string };
       if (!response.ok) throw new Error(data.detail || "操作失败，请检查输入");
+
+      if (mode === "register" && !codeSent) {
+        setCodeSent(true);
+        setMessage(data.message || (method === "phone" ? "短信验证码已发送，请查收手机短信。" : "验证码已发送，请查收邮箱。"));
+        setSuccess(true);
+        return;
+      }
+
       const csrf = String(data.csrf_token || "");
       if (!csrf) throw new Error("安全会话建立失败，请重试");
       setCsrfToken(csrf);
       await loadLicense(csrf);
       await loadDevices();
       setSuccess(true);
-      setMessage("登录成功，账号与试用状态已连接。");
+      setMessage(mode === "register" ? (method === "phone" ? "手机号验证成功，账号创建完成。" : "邮箱验证成功，账号创建完成。") : "登录成功，账号与试用状态已连接。");
       setPassword("");
+      setVerificationCode("");
+      setCodeSent(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "网络连接失败");
     } finally {
@@ -97,7 +168,7 @@ export default function AccountPage() {
 
   async function removeDevice(deviceId: string) {
     try {
-      const response = await fetch(`${API}/api/v1/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": csrfToken } });
+      const response = await fetch(apiUrl(`/api/v1/devices/${encodeURIComponent(deviceId)}`), { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": csrfToken } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "解除设备失败");
       setDevices(items => items.filter(item => item.device_id !== deviceId));
@@ -105,23 +176,35 @@ export default function AccountPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "解除设备失败"); setSuccess(false); }
   }
 
-  async function sendVerification() {
+  async function resendRegistrationCode() {
+    setBusy(true);
+    setMessage("");
+    setSuccess(false);
     try {
-      const response = await fetch(`${API}/api/v1/auth/email/verify/request`, {
-        method: "POST", credentials: "include", headers: { "X-CSRF-Token": csrfToken }
+      const endpoint = registerMethod === "phone"
+        ? "/api/v1/auth/register/phone/send-code"
+        : "/api/v1/auth/register/resend-code";
+      const body = registerMethod === "phone" ? { phone } : { email, password };
+      const response = await fetch(apiUrl(endpoint), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
-      const data = await response.json();
-      setMessage(response.ok ? data.message : data.detail || "发送失败");
-      setSuccess(response.ok);
-    } catch {
-      setMessage("暂时无法发送验证邮件");
+      const data = await response.json() as { detail?: string; message?: string };
+      if (!response.ok) throw new Error(data.detail || "验证码发送失败");
+      setMessage(data.message || "新的验证码已发送。");
+      setSuccess(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "验证码发送失败");
       setSuccess(false);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function logout() {
     try {
-      const response = await fetch(`${API}/api/v1/auth/logout`, {
+      const response = await fetch(apiUrl("/api/v1/auth/logout"), {
         method: "POST",
         credentials: "include",
         headers: { "X-CSRF-Token": csrfToken }
@@ -150,21 +233,46 @@ export default function AccountPage() {
         <span className="system-pill"><i /> 账号中心</span>
       </header>
       <section className="account-wrap">
-        <a className="account-back" href="/">← 返回创作首页</a>
+        <a className="account-back" href={isNativeApp ? "/workspace/" : "/"}>← 返回{Capacitor.isNativePlatform() ? "软件工作台" : "官网首页"}</a>
         <div className="account-card">
           <p className="eyebrow">IDENTITY & LICENSE</p>
           <h1>账号中心</h1>
           <p>注册或登录账号，激活设备并查看免费试用状态。</p>
+          <section style={{ margin: "18px 0", padding: "16px", border: "1px solid rgba(140,144,255,.22)", borderRadius: "14px", background: "rgba(12,15,38,.55)" }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: "17px" }}>服务器连接设置</h2>
+            <p style={{ margin: "0 0 10px", fontSize: "12px", lineHeight: 1.7, color: "#aeb3d5" }}>配置 App 连接的 API 根地址。正式使用请填写已部署的 HTTPS 地址；只需填写域名，不要添加 /api 路径。</p>
+            <label style={{ display: "block", fontSize: "12px" }}>API 根地址
+              <input type="url" inputMode="url" autoCapitalize="none" spellCheck={false} value={apiBase} onChange={event => setApiBase(event.target.value)} placeholder="https://你的服务器域名" style={{ display: "block", width: "100%", boxSizing: "border-box", marginTop: "7px", padding: "12px", borderRadius: "9px" }} />
+            </label>
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+              <button type="button" className="account-submit" disabled={apiBusy} onClick={() => void testApiServer()}>{apiBusy ? "检测中…" : "测试连接"}</button>
+              <button type="button" className="account-submit" disabled={apiBusy} onClick={saveApiServer}>保存并重载</button>
+            </div>
+            <p role="status" aria-live="polite" className="account-message">{apiStatus}</p>
+          </section>
+
           {!license && (
             <>
               <div className="account-tabs">
-                <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>创建账号</button>
-                <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>登录账号</button>
+                <button type="button" className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>创建账号</button>
+                <button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>登录账号</button>
+              </div>
+              <div className="account-tabs account-method-tabs">
+                <button type="button" className={(mode === "register" ? registerMethod : loginMethod) === "email" ? "active" : ""} onClick={() => { if (mode === "register") setRegisterMethod("email"); else setLoginMethod("email"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>邮箱方式</button>
+                <button type="button" className={(mode === "register" ? registerMethod : loginMethod) === "phone" ? "active" : ""} onClick={() => { if (mode === "register") setRegisterMethod("phone"); else setLoginMethod("phone"); setCodeSent(false); setVerificationCode(""); setMessage(""); }}>手机号方式</button>
               </div>
               <form className="account-form" onSubmit={submit}>
-                <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                {(mode === "register" ? registerMethod : loginMethod) === "phone"
+                  ? <label>中国大陆手机号<input type="tel" inputMode="numeric" autoComplete="tel-national" pattern="1[3-9][0-9]{9}" maxLength={11} required value={phone} disabled={mode === "register" && codeSent} onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="请输入11位手机号" /></label>
+                  : <label>邮箱地址<input type="email" autoComplete="email" required value={email} disabled={mode === "register" && codeSent} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>}
                 <label>密码（至少10位）<input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={10} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入至少10位密码" /></label>
-                <button className="account-submit" disabled={busy}>{busy ? "正在连接…" : mode === "register" ? "注册并开始试用" : "登录并查看授权"}</button>
+                {mode === "register" && codeSent && (
+                  <label>{registerMethod === "phone" ? "短信验证码" : "邮箱验证码"}<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={registerMethod === "phone" ? "请输入手机收到的6位数字验证码" : "请输入邮箱收到的6位数字验证码"} /></label>
+                )}
+                <button className="account-submit" disabled={busy}>{busy ? "正在处理…" : mode === "register" ? codeSent ? "验证并创建账号" : (registerMethod === "phone" ? "获取短信验证码" : "获取邮箱验证码") : "登录并查看授权"}</button>
+                {mode === "register" && codeSent && (
+                  <button type="button" className="account-submit" disabled={busy} onClick={() => void resendRegistrationCode()}>重新发送验证码</button>
+                )}
               </form>
               <a className="account-back" href="/forgot-password">忘记密码？点击找回</a>
             </>
@@ -174,15 +282,14 @@ export default function AccountPage() {
             <div className="account-status">
               <strong>{license.message}</strong><br />
               <h3>已绑定设备（最多3台）</h3>{devices.map(device => <div className="portal-card" key={device.device_id}><strong>{device.platform}</strong><small>{device.device_id}</small><button type="button" className="account-submit" onClick={() => void removeDevice(device.device_id)}>解除此设备</button></div>)}<br />
-              <button type="button" className="account-submit" onClick={() => void sendVerification()}>发送邮箱验证邮件</button><br />
               {license.status === "trial" && `剩余试用时间：${hours}小时 ${minutes}分钟`}
-              {license.status === "expired" && "请前往官网购买永久授权。"}
+              {license.status === "expired" && "48小时试用已结束。请前往官方网站完成付款，付款核实后即可恢复软件全部功能。"}
               {license.status === "permanent" && "此账号已获得永久授权。"}
-              <br /><button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
+              <br />{license.status === "expired" && <button type="button" className="account-submit" onClick={() => void openOfficialPayment()}>前往官网付款</button>}<button type="button" className="account-submit" onClick={() => void logout()}>退出登录</button>
             </div>
           )}
           <p className="account-message">登录凭据由 HttpOnly Cookie 保存；页面不会读取或保存访问令牌。</p>
-          <a className="account-back" href="/store">购买永久授权</a>　<a className="account-back" href="/orders">订单查询</a>
+          
         </div>
       </section>
     </main>

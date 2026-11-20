@@ -64,6 +64,39 @@ def test_project_novel_import_and_owner_isolation():
 
 
 
+def test_permanent_license_keeps_same_core_creation_and_import_access_as_trial():
+    with TestClient(app, base_url="http://localhost:3000") as client:
+        csrf = register(client, "permanent-feature-parity@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activated = client.post("/api/v1/license/activate", headers=headers, json={
+            "device_id": "feature-parity-device", "platform": "android"
+        })
+        assert activated.status_code == 200
+        assert activated.json()["status"] == "trial"
+
+        db = TestingSessionLocal()
+        try:
+            user = db.scalar(select(User).where(User.email == "permanent-feature-parity@example.com"))
+            license_record = db.scalar(select(License).where(License.user_id == user.id))
+            license_record.permanent = True
+            db.commit()
+        finally:
+            db.close()
+
+        status_response = client.get("/api/v1/license/status")
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "permanent"
+
+        created = client.post("/api/v1/projects", headers=headers, json={"title": "正式授权功能测试"})
+        assert created.status_code == 200
+        imported = client.post(
+            f"/api/v1/projects/{created.json()['id']}/novels",
+            headers=headers,
+            json={"title": "正式授权小说", "text": "第一章\n正文"},
+        )
+        assert imported.status_code == 200
+
+
 def test_release_download_requires_permanent_license_and_hides_direct_url():
     with TestClient(app, base_url="http://localhost:3000") as client:
         csrf = register(client, "release-trial@example.com")
@@ -211,6 +244,8 @@ def test_expired_trial_blocks_writes_but_keeps_project_export():
 
         blocked = client.post("/api/v1/projects", headers=headers, json={"title": "到期后新项目"})
         assert blocked.status_code == 402
+        blocked_ai_test = client.post("/api/v1/ai-provider-configs/text/test", headers=headers)
+        assert blocked_ai_test.status_code == 402
         exported = client.get(f"/api/v1/projects/{project_id}/export")
         assert exported.status_code == 200
         assert exported.json()["project"]["title"] == "保留数据项目"
@@ -235,6 +270,15 @@ def test_trial_is_exactly_48_hours_even_if_environment_setting_differs(monkeypat
             db.commit()
         finally:
             db.close()
+        status_response = client.get("/api/v1/license/status")
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "expired"
+        assert status_response.json()["remaining_seconds"] == 0
+        from datetime import datetime
+        started_at = datetime.fromisoformat(status_response.json()["trial_started_at"])
+        expires_at = datetime.fromisoformat(status_response.json()["trial_expires_at"])
+        assert int((expires_at - started_at).total_seconds()) == 48 * 3600
+
         blocked = client.post("/api/v1/projects", headers=headers, json={"title": "49小时后不能创建"})
         assert blocked.status_code == 402
 
@@ -250,3 +294,22 @@ def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
         })
         assert first.status_code == 401
         assert second.status_code == 429
+
+
+def test_tomato_platform_publish_draft_is_supported_without_claiming_auto_publish():
+    # Give this test an isolated client IP so earlier rate-limit tests cannot
+    # exhaust the shared in-memory database bucket for the registration route.
+    with TestClient(app, base_url="http://localhost:3000", client=("127.0.0.42", 50000)) as client:
+        csrf = register(client, "tomato-publisher@example.com")
+        headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
+        activation = client.post("/api/v1/license/activate", headers=headers,
+                                 json={"device_id": "tomato-publish-device", "platform": "android"})
+        assert activation.status_code == 200
+        response = client.post("/api/v1/publishing/jobs", headers=headers, json={
+            "platform": "fanqie", "title": "番茄平台测试作品",
+            "description": "发布资料草稿", "media_url": "https://media.example.com/test.mp4",
+        })
+        assert response.status_code == 200, response.text
+        assert response.json()["platform"] == "fanqie"
+        assert response.json()["status"] == "manual_required"
+        assert response.json()["auto_publish_available"] is False

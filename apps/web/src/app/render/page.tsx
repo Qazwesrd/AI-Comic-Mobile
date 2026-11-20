@@ -1,9 +1,11 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { useEffect,useState } from "react";
 import { csrfHeaders } from "../../lib/api";
 
-const API=process.env.NEXT_PUBLIC_API_BASE_URL||"http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 type Asset={id:number;asset_type:string;title:string;file_name:string;size_bytes:number};
 type Job={id:number;status:string;output_asset_id:number|null;error_message:string|null;created_at:string};
 

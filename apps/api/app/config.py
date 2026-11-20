@@ -20,13 +20,22 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    gmail_sender_email: str = ""
+    aliyun_access_key_id: str = ""
+    aliyun_access_key_secret: str = ""
+    aliyun_sms_sign_name: str = ""
+    aliyun_sms_template_code: str = ""
+    aliyun_sms_scheme_name: str = ""
     payment_webhook_secret: str = ""
     payment_checkout_url: str = ""
     admin_bootstrap_emails: str = ""
     rate_limit_auth_per_minute: int = 8
     rate_limit_email_per_hour: int = 5
     max_active_devices: int = 3
-    require_email_verification: bool = False
+    require_email_verification: bool = True
     ai_api_base_url: str = ""
     ai_api_key: str = ""
     ai_model: str = ""
@@ -58,9 +67,6 @@ if settings.app_env.lower() == "production" and settings.session_cookie_samesite
     # SameSite=None is valid only with Secure cookies.
     pass
 
-if settings.app_env.lower() == "production" and settings.require_email_verification:
-    if not all([settings.smtp_host, settings.smtp_from_email]):
-        raise RuntimeError("SMTP settings are required when email verification is enforced.")
 if settings.app_env.lower() == "production" and not settings.token_pepper:
     raise RuntimeError("TOKEN_PEPPER must be configured in production.")
 

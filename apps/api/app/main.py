@@ -30,11 +30,16 @@ async def lifespan(_: FastAPI):
 def _cors_origins() -> list[str]:
     configured = settings.cors_origins or os.getenv("CORS_ORIGINS", "")
     origins = [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
-    if origins:
-        return origins
+    # Capacitor Android uses https://localhost; iOS uses capacitor://localhost.
+    # Keep these exact origins available so native WebViews can call the remote API.
+    for native_origin in ("https://localhost", "capacitor://localhost"):
+        if native_origin not in origins:
+            origins.append(native_origin)
     if settings.app_env.lower() == "development":
-        return [settings.web_origin.rstrip("/"), "http://127.0.0.1:3000"]
-    return []
+        for dev_origin in (settings.web_origin.rstrip("/"), "http://127.0.0.1:3000"):
+            if dev_origin and dev_origin not in origins:
+                origins.append(dev_origin)
+    return origins
 
 
 app = FastAPI(

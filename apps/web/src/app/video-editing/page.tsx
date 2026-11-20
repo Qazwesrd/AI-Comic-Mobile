@@ -1,10 +1,12 @@
 "use client";
 
+import { getApiBaseUrl } from "../../lib/api-base";
+
 import { useEffect, useState } from "react";
 import { csrfHeaders } from "../../lib/api";
 import AIToolHandoff from "../../components/ai-tool-handoff";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API = getApiBaseUrl();
 type Project = { id:number; title:string; description:string; aspect_ratio:string; source_count:number; revision:number };
 type Asset = { id:number; asset_type:string; title:string; file_name:string; size_bytes:number };
 type Source = { id:number; asset_id:number; title:string; file_name:string; duration_ms:number|null; probe_status:string };

@@ -1,18 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
+import NativeAppRedirect from "./NativeAppRedirect";
+import NativeAppChrome from "./NativeAppChrome";
 
 export const metadata: Metadata = {
-  title: "AI 漫剧手机版",
-  description: "把小说变成漫剧的移动端 AI 创作工作台。",
-  applicationName: "AI 漫剧手机版",
+  title: "AI 漫剧大师官方网站",
+  description: "AI 漫剧大师官方产品介绍、功能讲解、使用教程、付款与软件下载。",
+  applicationName: "AI 漫剧大师",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "AI 漫剧"
-  }
 };
 
 export const viewport: Viewport = {
@@ -26,7 +21,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body><ServiceWorkerRegistration />{children}</body>
+      <body><NativeAppRedirect /><NativeAppChrome />{children}</body>
     </html>
   );
 }

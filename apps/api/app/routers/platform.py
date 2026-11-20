@@ -21,6 +21,7 @@ from ..models import (
     Product, Project, PublishJob, Release, User, UserSession, Novel, StoryEntity, utc_now,
 )
 from ..security import hash_password
+from ..licensing import trial_is_expired
 from ..ai_service import chat_json
 from ..security_services import (
     audit, consume_one_time_token, create_one_time_token, enforce_rate_limit,
@@ -37,8 +38,8 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def require_active_license(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-    if settings.require_email_verification and not user.email_verified:
-        raise HTTPException(status_code=403, detail="请先完成邮箱验证")
+    if settings.require_email_verification and not (user.email_verified or user.phone_verified):
+        raise HTTPException(status_code=403, detail="请先完成手机号或邮箱验证")
     record = db.scalar(select(License).where(License.user_id == user.id))
     if record is None:
         raise HTTPException(status_code=402, detail="请先激活设备开始48小时试用")
@@ -46,10 +47,7 @@ def require_active_license(user: User = Depends(get_current_user), db: Session =
         return user
     if not record.trial_started_at:
         raise HTTPException(status_code=402, detail="请先激活设备开始48小时试用")
-    started = record.trial_started_at
-    if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) >= started + timedelta(hours=48):
+    if trial_is_expired(record.trial_started_at):
         raise HTTPException(status_code=402, detail="免费试用已结束，请购买永久授权")
     return user
 
@@ -125,7 +123,7 @@ class EntityReviewIn(BaseModel):
 
 
 class PublishIn(BaseModel):
-    platform: str = Field(pattern="^(douyin|hongguo|kuaishou)$")
+    platform: str = Field(pattern="^(douyin|hongguo|kuaishou|fanqie)$")
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     media_url: str = Field(min_length=8, max_length=2048)
@@ -203,7 +201,7 @@ def create_order(
     payload: OrderCreateIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     enforce_rate_limit(db, f"create-order:{request_fingerprint(request)}", 10, 3600)
-    if settings.require_email_verification and not user.email_verified:
+    if settings.require_email_verification and not (user.email_verified or user.phone_verified):
         raise HTTPException(status_code=403, detail="请先完成邮箱验证")
     code = payload.product_code
     product = db.scalar(select(Product).where(Product.code == code, Product.active.is_(True)))
@@ -359,7 +357,7 @@ def list_releases(platform: str | None = None, db: Session = Depends(get_db)):
 
 @router.get("/releases/{release_id}/download")
 def download_release(
-    release_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    release_id: int, user: User = Depends(require_active_license), db: Session = Depends(get_db)
 ):
     license_record = db.scalar(select(License).where(License.user_id == user.id))
     if license_record is None or not license_record.permanent:
@@ -436,6 +434,23 @@ def list_projects(user: User = Depends(get_current_user), db: Session = Depends(
     return [{"id": p.id, "title": p.title, "description": p.description, "status": p.status} for p in rows]
 
 
+@router.get("/projects/{project_id}/novels")
+def list_project_novels(
+    project_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    novels = db.scalars(select(Novel).where(Novel.project_id == project_id).order_by(desc(Novel.id))).all()
+    return [{
+        "id": novel.id,
+        "title": novel.title,
+        "analysis_status": novel.analysis_status,
+        "chapter_count": db.query(Chapter).filter(Chapter.novel_id == novel.id).count(),
+        "analyzed_chapter_count": db.query(Chapter).filter(Chapter.novel_id == novel.id, Chapter.analysis_json.is_not(None)).count(),
+    } for novel in novels]
+
+
 @router.post("/projects/{project_id}/novels")
 def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require_active_license), db: Session = Depends(get_db)):
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
@@ -463,6 +478,26 @@ def import_novel(project_id: int, payload: NovelIn, user: User = Depends(require
     chapter_count = db.query(Chapter).filter(Chapter.novel_id == novel.id).count()
     return {"novel_id": novel.id, "chapter_count": chapter_count, "analysis_status": "pending",
             "message": "小说已导入并拆分章节；AI 深度解析需要配置模型服务后执行"}
+
+
+@router.get("/projects/{project_id}/novels/{novel_id}/chapters")
+def list_novel_chapters(
+    project_id: int, novel_id: int,
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
+    novel = db.scalar(select(Novel).where(Novel.id == novel_id, Novel.project_id == project_id))
+    if project is None or novel is None:
+        raise HTTPException(status_code=404, detail="项目或小说不存在")
+    chapters = db.scalars(
+        select(Chapter).where(Chapter.novel_id == novel_id).order_by(Chapter.chapter_no)
+    ).all()
+    return [{
+        "chapter_no": chapter.chapter_no,
+        "title": chapter.title,
+        "analyzed": bool(chapter.analysis_json),
+        "analysis": json.loads(chapter.analysis_json) if chapter.analysis_json else None,
+    } for chapter in chapters]
 
 
 @router.post("/projects/{project_id}/novels/{novel_id}/analyze")
@@ -528,9 +563,7 @@ async def analyze_novel(
 
 
 def _license_expired(started_at: datetime) -> bool:
-    if started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) >= started_at + timedelta(hours=settings.trial_hours)
+    return trial_is_expired(started_at)
 
 
 async def _generate_artifact(
