@@ -297,7 +297,9 @@ def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
 
 
 def test_tomato_platform_publish_draft_is_supported_without_claiming_auto_publish():
-    with TestClient(app, base_url="http://localhost:3000") as client:
+    # Give this test an isolated client IP so earlier rate-limit tests cannot
+    # exhaust the shared in-memory database bucket for the registration route.
+    with TestClient(app, base_url="http://localhost:3000", client=("127.0.0.42", 50000)) as client:
         csrf = register(client, "tomato-publisher@example.com")
         headers = {"X-CSRF-Token": csrf, "Origin": "http://localhost:3000"}
         activation = client.post("/api/v1/license/activate", headers=headers,
