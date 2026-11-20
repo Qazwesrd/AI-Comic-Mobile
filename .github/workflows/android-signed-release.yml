@@ -185,7 +185,13 @@ jobs:
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          apksigner verify --verbose "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "Android build-tools apksigner was not found"
+            find "$ANDROID_HOME/build-tools" -maxdepth 3 -type f | head -80
+            exit 1
+          fi
+          "$APKSIGNER" verify --verbose "$APK"
           sha256sum "$APK" | tee android/app/build/outputs/apk/release/SHA256SUMS.txt
           cp "$APK" "android/app/build/outputs/apk/release/AI-Comic-Mobile-${RELEASE_CHANNEL}-${VERSION_NAME}.apk"
       - uses: actions/upload-artifact@v4
