@@ -51,3 +51,20 @@
 ## 6. 当前实现状态
 
 本规则是目标发布规范，不代表发布流水线已经完成。当前仓库 Android Actions 产物是 Debug APK；尚需完成同签名的测试发布包、正式签名密钥管理、短时效下载凭证、真实官网授权下载验收和真机覆盖升级测试。在这些项目完成前，不应把现有 Debug APK 当作可公开发布的正式测试包，也不应宣布正式版已可下载。
+
+## 7. 已加入的签名构建工作流
+
+仓库新增手动触发工作流 `.github/workflows/android-signed-release.yml`，支持选择 `test` 或 `production` 渠道并生成发布签名 APK。该工作流只上传保留 14 天的 GitHub Actions Artifact，不会创建 GitHub Release，也不会公开正式版下载链接。
+
+运行前，仓库管理员必须在 GitHub Actions Secrets 中配置以下四项，测试版和正式版必须使用同一套密钥：
+
+- `ANDROID_RELEASE_KEYSTORE_BASE64`：发布 keystore 文件的 Base64 内容。
+- `ANDROID_RELEASE_KEYSTORE_PASSWORD`：keystore 密码。
+- `ANDROID_RELEASE_KEY_ALIAS`：签名 alias。
+- `ANDROID_RELEASE_KEY_PASSWORD`：alias 密码。
+
+另外需要建立 GitHub Environments：
+- `test-release`：测试包构建环境。
+- `production`：正式包构建环境，建议启用 Required reviewers 审批。
+
+首次使用前必须人工确认 applicationId、签名证书指纹和已有用户安装包兼容性。**不得为了让构建通过而重新生成签名密钥**，否则可能导致已安装测试版无法覆盖升级。该工作流尚需真实配置 Secrets/Environments 后执行验证；生成 Artifact 不等于已发布到小红书或官网。
